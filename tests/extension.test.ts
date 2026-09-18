@@ -1,67 +1,133 @@
 import { describe, expect, test } from "bun:test";
 import registerExtension_ from "../extension.ts";
 
-type Handler = (event?: any) => any;
+interface TextBlock {
+  type: "text";
+  text: string;
+}
+
+interface OtherBlock {
+  type: string;
+  text?: string;
+}
+
+type ContentBlock = TextBlock | OtherBlock;
+
+interface Message {
+  role: string;
+  content: string | ContentBlock[];
+  timestamp?: number;
+}
+
+interface ContextEvent {
+  messages: Message[];
+}
+
+interface ContextResult {
+  messages: Message[];
+}
+
+type LifecycleEvent = Record<string, unknown>;
+
+interface AgentEndEvent {
+  willContinue?: boolean;
+}
+
+type SessionHandler = (event: LifecycleEvent) => Promise<void> | void;
+type AgentEndHandler = (event: AgentEndEvent) => Promise<void> | void;
+type ContextHandler = (event: ContextEvent) => Promise<ContextResult | undefined> | ContextResult | undefined;
+type AnyHandler = SessionHandler | AgentEndHandler | ContextHandler;
+
+interface RecordedCall {
+  event: string;
+  handler: AnyHandler;
+}
 
 interface FakeExtensionAPI {
-  on(event: string, handler: Handler): void;
+  on(event: string, handler: AnyHandler): void;
 }
 
 interface Handlers {
-  [event: string]: Handler;
+  session_start: SessionHandler;
+  before_agent_start: SessionHandler;
+  session_compact: SessionHandler;
+  agent_end: AgentEndHandler;
+  context: ContextHandler;
 }
 
-function registerExtension(): Handlers {
-  const handlers: Handlers = {};
+interface Registered {
+  handlers: Handlers;
+  calls: RecordedCall[];
+}
+
+function registerExtension(): Registered {
+  const calls: RecordedCall[] = [];
+  const handlers: Partial<Record<string, AnyHandler>> = {};
   const fake: FakeExtensionAPI = {
     on(event, handler) {
+      calls.push({ event, handler });
       handlers[event] = handler;
     },
   };
-  registerExtension_(fake as any);
-  return handlers;
+  // The fake stands in for OMP's real ExtensionAPI; it only needs to satisfy
+  // the single `on(event, handler)` method the extension calls.
+  registerExtension_(fake as unknown as Parameters<typeof registerExtension_>[0]);
+  return { handlers: handlers as unknown as Handlers, calls };
 }
 
-function text(message: any): string {
+function isTextBlock(block: ContentBlock): block is TextBlock {
+  return block.type === "text" && typeof block.text === "string";
+}
+
+function text(message: Message): string {
   if (typeof message.content === "string") return message.content;
   return message.content
-    .filter((block: any) => block.type === "text")
-    .map((block: any) => block.text)
+    .filter(isTextBlock)
+    .map(block => block.text)
     .join("\n");
 }
 
+function messagesOf(result: ContextResult | undefined): Message[] {
+  if (!result) throw new Error("expected a context result with messages");
+  return result.messages;
+}
+
 describe("superpowersOmpExtension", () => {
-  test("registers exactly the five expected lifecycle handlers", () => {
-    const handlers = registerExtension();
+  test("registers exactly five lifecycle handlers with no duplicate registrations", () => {
+    const { handlers, calls } = registerExtension();
+    expect(calls).toHaveLength(5);
+    expect(calls.map(call => call.event).sort()).toEqual(
+      ["agent_end", "before_agent_start", "context", "session_compact", "session_start"].sort(),
+    );
     expect(Object.keys(handlers).sort()).toEqual(
       ["agent_end", "before_agent_start", "context", "session_compact", "session_start"].sort(),
     );
   });
 
   test("injects exactly one bootstrap into each fresh provider context while active", async () => {
-    const handlers = registerExtension();
+    const { handlers } = registerExtension();
     await handlers.session_start({});
-    const first = await handlers.context({ messages: [{ role: "user", content: "first" }] });
-    const second = await handlers.context({ messages: [{ role: "user", content: "second" }] });
+    const first = messagesOf(await handlers.context({ messages: [{ role: "user", content: "first" }] }));
+    const second = messagesOf(await handlers.context({ messages: [{ role: "user", content: "second" }] }));
 
-    expect(first.messages).toHaveLength(2);
-    expect(second.messages).toHaveLength(2);
-    expect(text(first.messages[0])).toContain("superpowers:using-superpowers bootstrap for omp");
-    expect(text(first.messages[0])).toContain("# OMP (Oh My Pi) Tool Mapping");
+    expect(first).toHaveLength(2);
+    expect(second).toHaveLength(2);
+    expect(text(first[0])).toContain("superpowers:using-superpowers bootstrap for omp");
+    expect(text(first[0])).toContain("# OMP (Oh My Pi) Tool Mapping");
   });
 
   test("retains bootstrap injection for an OMP scheduled continuation", async () => {
-    const handlers = registerExtension();
+    const { handlers } = registerExtension();
     await handlers.session_start({});
     await handlers.agent_end({ willContinue: true });
-    const result = await handlers.context({ messages: [{ role: "user", content: "continue" }] });
-    expect(result.messages).toHaveLength(2);
+    const result = messagesOf(await handlers.context({ messages: [{ role: "user", content: "continue" }] }));
+    expect(result).toHaveLength(2);
   });
 
-  test("an existing marker prevents another insertion", async () => {
-    const handlers = registerExtension();
+  test("an existing marker in a text block prevents another insertion", async () => {
+    const { handlers } = registerExtension();
     await handlers.session_start({});
-    const existing = {
+    const existing: Message = {
       role: "user",
       content: [{ type: "text", text: "superpowers:using-superpowers bootstrap for omp already here" }],
     };
@@ -69,20 +135,29 @@ describe("superpowersOmpExtension", () => {
     expect(result).toBeUndefined();
   });
 
-  test("leading compactionSummary remains first after reinjection", async () => {
-    const handlers = registerExtension();
+  test("an existing marker in plain string content prevents another insertion", async () => {
+    const { handlers } = registerExtension();
     await handlers.session_start({});
-    const summary = { role: "compactionSummary", content: "summary of prior session" };
-    const result = await handlers.context({ messages: [summary, { role: "user", content: "next" }] });
+    const result = await handlers.context({
+      messages: [{ role: "user", content: "superpowers:using-superpowers bootstrap for omp" }],
+    });
+    expect(result).toBeUndefined();
+  });
 
-    expect(result.messages).toHaveLength(3);
-    expect(result.messages[0]).toBe(summary);
-    expect(text(result.messages[1])).toContain("superpowers:using-superpowers bootstrap for omp");
-    expect(result.messages[2].content).toBe("next");
+  test("leading compactionSummary remains first after reinjection", async () => {
+    const { handlers } = registerExtension();
+    await handlers.session_start({});
+    const summary: Message = { role: "compactionSummary", content: "summary of prior session" };
+    const result = messagesOf(await handlers.context({ messages: [summary, { role: "user", content: "next" }] }));
+
+    expect(result).toHaveLength(3);
+    expect(result[0]).toBe(summary);
+    expect(text(result[1])).toContain("superpowers:using-superpowers bootstrap for omp");
+    expect(result[2].content).toBe("next");
   });
 
   test("terminal agent_end disables injection", async () => {
-    const handlers = registerExtension();
+    const { handlers } = registerExtension();
     await handlers.session_start({});
     await handlers.agent_end({ willContinue: false });
     const result = await handlers.context({ messages: [{ role: "user", content: "after end" }] });
@@ -90,11 +165,29 @@ describe("superpowersOmpExtension", () => {
   });
 
   test("before_agent_start re-arms injection after a terminal agent_end", async () => {
-    const handlers = registerExtension();
+    const { handlers } = registerExtension();
     await handlers.session_start({});
     await handlers.agent_end({ willContinue: false });
     await handlers.before_agent_start({});
-    const result = await handlers.context({ messages: [{ role: "user", content: "new turn" }] });
-    expect(result.messages).toHaveLength(2);
+    const result = messagesOf(await handlers.context({ messages: [{ role: "user", content: "new turn" }] }));
+    expect(result).toHaveLength(2);
+  });
+
+  test("session_compact re-arms injection after a terminal agent_end", async () => {
+    const { handlers } = registerExtension();
+    await handlers.agent_end({ willContinue: false });
+    await handlers.session_compact({});
+    const result = messagesOf(await handlers.context({ messages: [{ role: "user", content: "plain" }] }));
+    expect(result).toHaveLength(2);
+    expect(text(result[0])).toContain("superpowers:using-superpowers bootstrap for omp");
+  });
+
+  test("session_start re-arms injection after a terminal agent_end", async () => {
+    const { handlers } = registerExtension();
+    await handlers.agent_end({ willContinue: false });
+    await handlers.session_start({});
+    const result = messagesOf(await handlers.context({ messages: [{ role: "user", content: "plain" }] }));
+    expect(result).toHaveLength(2);
+    expect(text(result[0])).toContain("superpowers:using-superpowers bootstrap for omp");
   });
 });
