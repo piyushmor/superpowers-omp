@@ -44,14 +44,15 @@ The tested OMP release is `18.2.0`; the only documented extension runtime prereq
 
 ## Bootstrap lifecycle
 
-The extension factory accepts OMP's `ExtensionAPI` and registers only four event handlers:
+The extension factory accepts OMP's `ExtensionAPI` and registers five event handlers:
 
 1. `session_start` sets a closure-local `injectBootstrap` flag.
-2. `context` returns a replacement `messages` array only when the flag is set, the bootstrap marker is absent, and the bundled source files can be read. It inserts one `role: "user"` text message after all leading `compactionSummary` messages.
-3. `session_compact` sets the flag again. On the next context build, this restores the bootstrap after the compaction summary.
-4. `agent_end` clears the flag. The existing bootstrap remains in the session context until compaction; this handler prevents an unnecessary new injection on a later context build.
+2. `before_agent_start` sets the flag for every new agent run, including a later user prompt in the same session.
+3. `context` returns a replacement `messages` array only when the flag is set, the bootstrap marker is absent, and the bundled source files can be read. It inserts one `role: "user"` text message after all leading `compactionSummary` messages. OMP applies this result only to the outbound provider request, not to session history, so the handler leaves the flag set and injects the bootstrap into every otherwise-unmarked provider context during an active run.
+4. `session_compact` sets the flag again, ensuring an in-progress run remains armed after its context is summarized.
+5. `agent_end` clears the flag only when `event.willContinue !== true`. A scheduled retry, compaction continuation, or queued follow-up leaves it armed because those paths proceed directly to provider context without another `before_agent_start` event.
 
-The bootstrap source is cached at module scope. It reads and removes YAML frontmatter from `skills/using-superpowers/SKILL.md`, appends the content of `omp-tools.md`, and wraps both in `<EXTREMELY_IMPORTANT>` tags. The marker is a package-specific literal searched in string and text-block message content. This makes injection idempotent across retrying `context` events.
+The bootstrap source is cached at module scope. It reads and removes YAML frontmatter from `skills/using-superpowers/SKILL.md`, appends the content of `omp-tools.md`, and wraps both in `<EXTREMELY_IMPORTANT>` tags. The marker prevents a second copy from being inserted into one outbound context when a prior handler has already supplied it.
 
 The extension never performs runtime actions during factory loading, registers no tools or commands, makes no network calls, and writes no session state.
 
@@ -77,13 +78,13 @@ The mapping is action-oriented, so future OMP tool changes have one isolated upd
 Bun unit tests create a fake `ExtensionAPI`, register the factory, and execute its handlers. They must prove:
 
 - `package.json` declares the actual extension entry and the plugin root includes the canonical skills directory.
-- The factory registers exactly the intended event handlers.
-- The first context injection contains the stripped bootstrap and OMP mapping as one user message.
-- A second context pass does not inject a duplicate.
+- The factory registers exactly the intended five event handlers.
+- The first outbound context contains the stripped bootstrap and OMP mapping as one user message.
+- A fresh, otherwise-unmarked outbound context in the same active run contains exactly one bootstrap; a context already containing the marker receives no second copy.
 - After `session_compact`, injection follows leading `compactionSummary` messages and precedes the user's message.
-- After `agent_end`, a context without an existing marker does not inject.
+- A terminal `agent_end` prevents injection until `before_agent_start` re-arms it for the next agent run; an `agent_end` with `willContinue: true` leaves the next continuation context armed.
 
-An isolated OMP plugin link operation using a temporary `PI_CODING_AGENT_DIR` validates that OMP accepts the package manifest and imports the extension. The package must not modify the caller's normal OMP plugin registry.
+An isolated OMP package-install operation runs with a newly created temporary `HOME` and no inherited XDG roots. It installs the pushed GitHub branch, so OMP imports and validates the manifest-declared extension while writing any plugin registry files only beneath that temporary home. `omp plugin link` is not used for this check because it validates only the link metadata, not extension importability.
 
 A live clean-session acceptance check is performed only if available credentials support a non-interactive OMP run: submit `Let's make a react todo list` and verify that `brainstorming` is invoked before any implementation action. If unavailable, the PR states that limitation rather than fabricating a transcript.
 
@@ -99,5 +100,5 @@ A live clean-session acceptance check is performed only if available credentials
 | --- | --- |
 | Upstream skills drift from the snapshot. | `UPSTREAM.md` records the exact source revision and a deliberate manual update procedure. |
 | OMP changes lifecycle message shapes. | Unit tests exercise the explicit context insertion contract; README names the tested OMP release. |
-| Large bootstrap repeats during one session. | Module cache avoids disk rereads; marker detection guarantees one injected copy between compactions. |
-| Plugin loading fails. | OMP validates manifest-declared extension entries at install/link time; the isolated link command exercises that path. |
+| Large bootstrap repeats during an agent run. | Module cache avoids disk rereads; each otherwise-unmarked outbound provider context receives exactly one bootstrap, as required by OMP's transient context-transform contract. |
+| Plugin loading fails. | OMP's package installer validates manifest-declared extension imports; the isolated Git install exercises that path without touching the normal registry. |
