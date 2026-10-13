@@ -1,5 +1,17 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import registerExtension_ from "../extension.ts";
+
+const repoRoot = resolve(import.meta.dir, "..");
+const skillSource = readFileSync(resolve(repoRoot, "skills/using-superpowers/SKILL.md"), "utf8");
+const mappingSource = readFileSync(resolve(repoRoot, "skills/using-superpowers/references/omp-tools.md"), "utf8");
+
+function skillBody(source: string): string {
+  const match = /^---\n[\s\S]*?\n---\n/.exec(source);
+  if (!match) throw new Error("using-superpowers SKILL.md must start with frontmatter");
+  return source.slice(match[0].length).trim();
+}
 
 interface TextBlock {
   type: "text";
@@ -189,5 +201,53 @@ describe("superpowersOmpExtension", () => {
     const result = messagesOf(await handlers.context({ messages: [{ role: "user", content: "plain" }] }));
     expect(result).toHaveLength(2);
     expect(text(result[0])).toContain("superpowers:using-superpowers bootstrap for omp");
+  });
+});
+
+describe("package wiring", () => {
+  test("package.json omp.extensions points at the tested extension module", () => {
+    const manifest = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
+    expect(manifest.omp?.extensions).toEqual(["./extension.ts"]);
+    const entry = resolve(repoRoot, manifest.omp.extensions[0]);
+    expect(existsSync(entry)).toBe(true);
+    expect(entry).toBe(resolve(repoRoot, "extension.ts"));
+    expect(typeof registerExtension_).toBe("function");
+  });
+});
+
+describe("injected bootstrap message", () => {
+  async function injected(): Promise<Message> {
+    const { handlers } = registerExtension();
+    await handlers.session_start({});
+    return messagesOf(await handlers.context({ messages: [{ role: "user", content: "hi" }] }))[0];
+  }
+
+  test("is a single user text block with a numeric timestamp", async () => {
+    const message = await injected();
+    expect(Object.keys(message).sort()).toEqual(["content", "role", "timestamp"]);
+    expect(message.role).toBe("user");
+    expect(typeof message.timestamp).toBe("number");
+    expect(Array.isArray(message.content)).toBe(true);
+    const blocks = message.content as ContentBlock[];
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("text");
+    expect(Object.keys(blocks[0]).sort()).toEqual(["text", "type"]);
+  });
+
+  test("wraps marker, embedded skill body, and OMP mapping in order", async () => {
+    const body = text(await injected());
+    expect(body.startsWith("<EXTREMELY_IMPORTANT>\nsuperpowers:using-superpowers bootstrap for omp\n")).toBe(true);
+    expect(body.endsWith("</EXTREMELY_IMPORTANT>")).toBe(true);
+    const skillAt = body.indexOf(skillBody(skillSource));
+    const mappingAt = body.indexOf(mappingSource.trim());
+    expect(skillAt).toBeGreaterThan(0);
+    expect(mappingAt).toBeGreaterThan(skillAt);
+  });
+
+  test("embeds the skill without its YAML frontmatter", async () => {
+    const body = text(await injected());
+    const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(skillSource)![1];
+    for (const line of frontmatter.split("\n")) expect(body).not.toContain(line);
+    expect(body).not.toContain("\n---\nname:");
   });
 });
