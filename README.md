@@ -20,6 +20,14 @@ Start a clean OMP session and send:
 
 `brainstorming` must be read before code or implementation actions.
 
+To check the bootstrap without installing, load the extension for one run:
+
+```bash
+omp -p --no-session -e ./extension.ts 'Quote the line in your context that contains "superpowers:using-superpowers bootstrap for omp".'
+```
+
+If you already expose Superpowers skills to OMP another way (for example symlinks from a Claude Code plugin cache into `~/.omp/agent/skills`), remove those first so each skill name resolves to one copy.
+
 ## Remove
 
 ```bash
@@ -28,7 +36,7 @@ omp plugin uninstall @piyushmor/superpowers-omp
 
 ## Compatibility
 
-This adapter was tested with OMP `18.2.0`.
+This adapter was tested with OMP `18.2.0` and re-verified with OMP `18.10.3` (extension lifecycle contract unchanged; live bootstrap injection confirmed in the provider payload).
 
 ## Trust boundary
 
