@@ -1,0 +1,10 @@
+{
+  "name": "@piyushmor/superpowers-omp",
+  "version": "0.1.0",
+  "description": "Native OMP adapter for the Superpowers skill library",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["omp", "oh-my-pi", "superpowers", "skills"],
+  "omp": { "extensions": ["./extension.ts"] },
+  "scripts": { "test": "bun test" }
+}
