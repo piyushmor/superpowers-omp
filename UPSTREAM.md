@@ -1,7 +1,7 @@
 # Upstream Provenance
 
 This package vendors the skill library from [obra/superpowers](https://github.com/obra/superpowers) at
-revision [`b36e0829c6d0140e93cfef2ca599b1b07d4a7797`](https://github.com/obra/superpowers/commit/b36e0829c6d0140e93cfef2ca599b1b07d4a7797).
+revision [`22f0b463e7a5e579904dd6211a520321035526f7`](https://github.com/obra/superpowers/commit/22f0b463e7a5e579904dd6211a520321035526f7) (v7.0.2).
 
 All files under `skills/` are copied verbatim from that revision and are unchanged; do not edit them
 directly. The only addition beneath `skills/` is `skills/using-superpowers/references/omp-tools.md`,
