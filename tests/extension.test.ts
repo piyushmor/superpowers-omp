@@ -136,15 +136,37 @@ describe("superpowersOmpExtension", () => {
     expect(result).toHaveLength(2);
   });
 
-  test("an existing marker in a text block prevents another insertion", async () => {
+  test("an existing marker line in a text block prevents another insertion", async () => {
     const { handlers } = registerExtension();
     await handlers.session_start({});
     const existing: Message = {
       role: "user",
-      content: [{ type: "text", text: "superpowers:using-superpowers bootstrap for omp already here" }],
+      content: [
+        {
+          type: "text",
+          text: "<EXTREMELY_IMPORTANT>\nsuperpowers:using-superpowers bootstrap for omp\nalready injected\n</EXTREMELY_IMPORTANT>",
+        },
+      ],
     };
     const result = await handlers.context({ messages: [existing, { role: "user", content: "hi" }] });
     expect(result).toBeUndefined();
+  });
+
+  test("a marker quoted inline inside a memories block does not suppress injection", async () => {
+    const { handlers } = registerExtension();
+    await handlers.session_start({});
+    const poisoned: Message = {
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: '<memories>\n- The injected line "superpowers:using-superpowers bootstrap for omp" marks the bootstrap.\n</memories>',
+        },
+      ],
+    };
+    const result = messagesOf(await handlers.context({ messages: [poisoned, { role: "user", content: "hi" }] }));
+    expect(result).toHaveLength(3);
+    expect(text(result[0])).toContain("superpowers:using-superpowers bootstrap for omp");
   });
 
   test("an existing marker in plain string content prevents another insertion", async () => {
