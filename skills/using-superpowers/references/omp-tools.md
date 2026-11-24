@@ -62,3 +62,31 @@ session.
 - The brainstorming visual companion launches like the Claude Code default-mode recipe in
 `visual-companion.md`: `bash scripts/start-server.sh --project-dir /path/to/project --open` — the
 script backgrounds the server itself, so no extra flags are needed on OMP.
+
+## Plans & TDD → todo (OMP's workflow substrate)
+
+OMP's `todo` tool is the live workflow view, and OMP features key off it: `prewalk` switches the
+session to the fast model at the first edit/write once the plan's todo list exists. Superpowers
+plans stay the authority — the plan file and the SDD ledger are the record; todo is their live
+projection, never the spec.
+
+- At plan handoff (writing-plans → execution), after the plan is approved, mirror it with `todo`
+  `init`: one phase per plan milestone, one item per `Task N: <title> — verify: <test command>`.
+  Task-level granularity only — never one item per TDD micro-step; todo churn costs turns.
+- Task lifecycle (executing-plans and the SDD controller): `task-start` → `todo` `start` on that
+  item; `task-done` (completion contract met, ledger line written) → `todo` `done`. A ruling or a
+  blocked task keeps its item in_progress; the detail lives in the ledger.
+- TDD reflection: RED/GREEN discipline stays in the ledger and the test runs. The todo item moves
+  start→done only when the completion contract holds — test watched fail, then pass, suite green.
+  Do not encode RED/GREEN as separate todo items.
+- Scope changes mid-run: edit the plan/ledger first (the record), then reflect with `todo` `append` /
+  `drop` / `rm`. Todo follows the plan, never the reverse.
+- After compaction, rebuild todo from the ledger's `Task N: complete` lines and `git log`, not from
+  memory; the ledger outranks the todo view.
+- Prewalk: with the todo mirror in place, run plan execution with `--prewalk` (or `prewalk.enabled`)
+  so implementation moves to the smol model at first edit — executing-plans is designed for a
+  mid-tier session model. The final whole-branch review still runs on the most capable model:
+  dispatch it with an explicit model, as the skill requires; prewalk does not override an explicit
+  subagent model. This bridges file-based superpowers plans, not OMP's native `--plan` mode.
+- Subagents: dispatched children get their own todo preludes and track their own brief; the
+  controller's todo mirrors the plan.
