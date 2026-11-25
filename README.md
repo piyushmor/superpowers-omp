@@ -148,6 +148,9 @@ Compare what worked, what needed fixing, how long it took, and what it cost.
 
 </details>
 
+See [What the tests cover](docs/test-tasks.md) for the coding tasks, skill
+scenarios, and approval checks.
+
 From a source checkout, validate coverage without a model call:
 
 ```bash
