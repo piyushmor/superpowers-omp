@@ -28,20 +28,27 @@ function getBootstrapContent(): string | null {
       `${skill}\n\n` +
       `${mapping}\n` +
       `</EXTREMELY_IMPORTANT>`;
-  } catch {
+  } catch (error) {
+    console.warn(`superpowers-omp: bootstrap content unavailable (${bootstrapSkillPath} / ${mappingPath}):`, error);
     cachedBootstrap = null;
   }
   return cachedBootstrap;
 }
 
+function textContainsBootstrap(text: string): boolean {
+  // Match the marker as a whole line (upstream OpenCode fix #2197): a quoted or
+  // inline mention of the marker must not suppress the real injection.
+  return text.split("\n").some(line => line.trim() === BOOTSTRAP_MARKER);
+}
+
 function blockContainsBootstrap(block: unknown): boolean {
   if (typeof block !== "object" || block === null) return false;
   const candidate = block as { type?: unknown; text?: unknown };
-  return candidate.type === "text" && typeof candidate.text === "string" && candidate.text.includes(BOOTSTRAP_MARKER);
+  return candidate.type === "text" && typeof candidate.text === "string" && textContainsBootstrap(candidate.text);
 }
 
 function messageContainsBootstrap(message: { content: unknown }): boolean {
-  if (typeof message.content === "string") return message.content.includes(BOOTSTRAP_MARKER);
+  if (typeof message.content === "string") return textContainsBootstrap(message.content);
   if (Array.isArray(message.content)) return message.content.some(blockContainsBootstrap);
   return false;
 }
