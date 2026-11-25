@@ -136,20 +136,12 @@ describe("superpowersOmpExtension", () => {
     expect(result).toHaveLength(2);
   });
 
-  test("an existing marker line in a text block prevents another insertion", async () => {
+  test("a previously injected text block prevents another insertion", async () => {
     const { handlers } = registerExtension();
     await handlers.session_start({});
-    const existing: Message = {
-      role: "user",
-      content: [
-        {
-          type: "text",
-          text: "<EXTREMELY_IMPORTANT>\nsuperpowers:using-superpowers bootstrap for omp\nalready injected\n</EXTREMELY_IMPORTANT>",
-        },
-      ],
-    };
-    const result = await handlers.context({ messages: [existing, { role: "user", content: "hi" }] });
-    expect(result).toBeUndefined();
+    const conversation: Message[] = [{ role: "user", content: "hi" }];
+    const withBootstrap = messagesOf(await handlers.context({ messages: conversation }));
+    expect(await handlers.context({ messages: withBootstrap })).toBeUndefined();
   });
 
   test("a marker quoted inline inside a memories block does not suppress injection", async () => {
@@ -169,13 +161,25 @@ describe("superpowersOmpExtension", () => {
     expect(text(result[0])).toContain("superpowers:using-superpowers bootstrap for omp");
   });
 
-  test("an existing marker in plain string content prevents another insertion", async () => {
+  test("a previously injected bootstrap in plain string form prevents another insertion", async () => {
     const { handlers } = registerExtension();
     await handlers.session_start({});
-    const result = await handlers.context({
-      messages: [{ role: "user", content: "superpowers:using-superpowers bootstrap for omp" }],
-    });
+    const conversation: Message[] = [{ role: "user", content: "hi" }];
+    const [injected] = messagesOf(await handlers.context({ messages: conversation }));
+    const result = await handlers.context({ messages: [{ role: "user", content: text(injected) }, ...conversation] });
     expect(result).toBeUndefined();
+  });
+
+  test("a marker recalled on its own line does not suppress injection", async () => {
+    const { handlers } = registerExtension();
+    await handlers.session_start({});
+    const original: Message = {
+      role: "user",
+      content: [{ type: "text", text: "<memories>\nsuperpowers:using-superpowers bootstrap for omp\n</memories>" }],
+    };
+    const result = messagesOf(await handlers.context({ messages: [original] }));
+    expect(result).toHaveLength(2);
+    expect(result[1]).toBe(original);
   });
 
   test("leading compactionSummary remains first after reinjection", async () => {
@@ -188,6 +192,18 @@ describe("superpowersOmpExtension", () => {
     expect(result[0]).toBe(summary);
     expect(text(result[1])).toContain("superpowers:using-superpowers bootstrap for omp");
     expect(result[2].content).toBe("next");
+  });
+
+  test("a compaction summary quoting the full bootstrap remains a summary", async () => {
+    const { handlers } = registerExtension();
+    await handlers.session_start({});
+    const conversation: Message[] = [{ role: "user", content: "continue" }];
+    const [injected] = messagesOf(await handlers.context({ messages: conversation }));
+    const summary: Message = { role: "compactionSummary", content: text(injected) };
+    const result = messagesOf(await handlers.context({ messages: [summary, ...conversation] }));
+    expect(result).toHaveLength(3);
+    expect(result[0]).toBe(summary);
+    expect(text(result[1])).toBe(text(injected));
   });
 
   test("terminal agent_end disables injection", async () => {
@@ -264,6 +280,16 @@ describe("injected bootstrap message", () => {
     const mappingAt = body.indexOf(mappingSource.trim());
     expect(skillAt).toBeGreaterThan(0);
     expect(mappingAt).toBeGreaterThan(skillAt);
+  });
+
+  test("keeps the mandatory context below 6,000 UTF-8 bytes", async () => {
+    expect(Buffer.byteLength(text(await injected()))).toBeLessThan(6000);
+  });
+
+  test("points to a packaged on-demand OMP workflow guide", async () => {
+    const uri = "skill://using-superpowers/references/omp-workflows.md";
+    expect(text(await injected())).toContain(uri);
+    expect(existsSync(resolve(repoRoot, "skills", uri.slice("skill://".length)))).toBe(true);
   });
 
   test("embeds the skill without its YAML frontmatter", async () => {
