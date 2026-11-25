@@ -24,6 +24,64 @@ Start a new OMP session after changing the installation.
 
 From a source checkout, run `bun test` to verify bootstrap injection and packaging.
 
+## Usage guide
+
+Superpowers adds skill guidance and workflows to the model you select in OMP.
+Loading a skill leaves the active model unchanged. To pin a model and effort,
+set `MODEL` to an exact selector configured in OMP and choose a supported
+thinking level:
+
+```bash
+omp --model "$MODEL" --thinking xhigh
+```
+
+For a routine, well-scoped change, start with plain OMP. Invoke a specific skill
+when you want targeted guidance. Use a broader Superpowers workflow when a task
+benefits from resolving requirements, planning several changes, or reviewing an
+approval boundary. Try it on a representative task before making it your default.
+
+### What we measured
+
+Each cell shows hidden-test passes over comparable pairs, **plain OMP → with
+Superpowers**. Both sessions in each pair used the same model, route, effort,
+task snapshot, and limits. Approval replay used scripted answers in print mode.
+
+| Model | Thinking | Approval replay | Unattended |
+| --- | --- | --- | --- |
+| GPT-6 Luna | `low` | 14/16 → 10/16 | 8/11 → 2/11 |
+| GPT-6 Luna | `xhigh` | 2/3 → 0/3 | 5/9 → 0/9 |
+| GPT-6.1 Terra | `xhigh` | 1/2 → 0/2 | 1/8 → 0/8 |
+
+The [Luna `low` cohort](https://github.com/piyushmor/superpowers-omp/issues/3)
+used six small tasks. With Superpowers, median elapsed time increased by 11.2 s
+in replay and 5.3 s unattended. Across those comparable pairs, the estimated
+cost with Superpowers was about 1.9 times the plain OMP cost. The separate
+[Luna and Terra `xhigh` cohort](https://github.com/piyushmor/superpowers-omp/issues/4)
+rechecked selected tasks and added a multi-file case. Time and spend limits
+affected both arms. The small samples and different task mixes limit comparisons
+across models and thinking levels. GPT-6.2 Sol has no paired work results here.
+
+In Luna’s `low` approval-replay runs, both arms passed all three
+collection-equality trials. The literal-regexp task passed 3/3 with plain OMP
+and 0/3 with Superpowers. None of the 49 comparable pairs across the two work
+cohorts gained a pass with Superpowers. These runs test the bundled workflow.
+Measuring the effect of an individual skill requires a separate paired test.
+
+### What skill results tell you
+
+A skill floor is the lowest tested model that passed a skill's checks at the
+given effort.
+
+Luna passed the calibration for `brainstorming` at `low` and for
+`verification-before-completion` at `xhigh`. Each result covers one positive case,
+one near miss, and three held-out repetitions. Fourteen `xhigh` skill floors
+remain unverified. All 12 Terra trials in the final skill retry batch reached a
+time or spend limit, so that batch has no completed Terra skill verdicts.
+
+For your own comparison, start with the model you already use and follow
+[Evals](#evals). Keep model, route, thinking level, and budget fixed within each
+pair. Judge task outcomes and rework alongside elapsed time and estimated cost.
+
 ## Remove
 
 ```bash
