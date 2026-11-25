@@ -1,12 +1,50 @@
 # @piyushmor/superpowers-omp
 
-Native OMP adapter for the [Superpowers](https://github.com/obra/superpowers) skill library.
+[Oh My Pi (OMP)](https://github.com/can1357/oh-my-pi) is an AI assistant you
+run in a terminal. This add-on brings [Superpowers](https://github.com/obra/superpowers)
+to OMP. It gives the assistant steps to follow when you’re planning a change,
+trying to find a bug, or checking its work.
 
 ## Install
+
+If you’re new to OMP, [set it up first](https://github.com/can1357/oh-my-pi).
+Then run this command in your terminal:
 
 ```bash
 omp plugin install github:piyushmor/superpowers-omp
 ```
+
+## Usage guide
+
+Open a terminal in the folder you want help with and type `omp` to start a new
+session. Describe what you want in your own words. For example:
+
+**Get to know a project**
+
+> I’m new to this project. Which files should I look at first? Explain what they
+> do, and leave the files unchanged.
+
+**Think through an idea**
+
+> Use the brainstorming skill. I’m making a sign-up page for a club. Help me
+> decide what it should ask for before we build anything.
+
+**Look into a bug**
+
+> Clicking Save once creates two copies. Help me figure out why. Show me what
+> you’d change before editing any files.
+
+A *skill* is a set of instructions the assistant can follow. You can ask for one
+by name, like `brainstorming`. Start with the AI model you already use in OMP.
+Asking for a skill leaves your model choice unchanged.
+
+For a small job, a direct request is a good place to start. For a bigger change,
+ask the assistant to explain its approach before it starts editing. When it
+finishes, ask what it checked and review the result before sharing it.
+
+In 49 comparisons on a small set of coding tasks, the full Superpowers workflow
+never passed a task that OMP alone failed. We still need to test how individual
+skills affect those results. See [the test results](#evals) for details.
 
 ## Verify and troubleshoot
 
@@ -23,64 +61,6 @@ check your user and project skills and disable the duplicate you do not want.
 Start a new OMP session after changing the installation.
 
 From a source checkout, run `bun test` to verify bootstrap injection and packaging.
-
-## Usage guide
-
-Superpowers adds skill guidance and workflows to the model you select in OMP.
-Loading a skill leaves the active model unchanged. To pin a model and effort,
-set `MODEL` to an exact selector configured in OMP and choose a supported
-thinking level:
-
-```bash
-omp --model "$MODEL" --thinking xhigh
-```
-
-For a routine, well-scoped change, start with plain OMP. Invoke a specific skill
-when you want targeted guidance. Use a broader Superpowers workflow when a task
-benefits from resolving requirements, planning several changes, or reviewing an
-approval boundary. Try it on a representative task before making it your default.
-
-### What we measured
-
-Each cell shows hidden-test passes over comparable pairs, **plain OMP → with
-Superpowers**. Both sessions in each pair used the same model, route, effort,
-task snapshot, and limits. Approval replay used scripted answers in print mode.
-
-| Model | Thinking | Approval replay | Unattended |
-| --- | --- | --- | --- |
-| GPT-6 Luna | `low` | 14/16 → 10/16 | 8/11 → 2/11 |
-| GPT-6 Luna | `xhigh` | 2/3 → 0/3 | 5/9 → 0/9 |
-| GPT-6.1 Terra | `xhigh` | 1/2 → 0/2 | 1/8 → 0/8 |
-
-The [Luna `low` cohort](https://github.com/piyushmor/superpowers-omp/issues/3)
-used six small tasks. With Superpowers, median elapsed time increased by 11.2 s
-in replay and 5.3 s unattended. Across those comparable pairs, the estimated
-cost with Superpowers was about 1.9 times the plain OMP cost. The separate
-[Luna and Terra `xhigh` cohort](https://github.com/piyushmor/superpowers-omp/issues/4)
-rechecked selected tasks and added a multi-file case. Time and spend limits
-affected both arms. The small samples and different task mixes limit comparisons
-across models and thinking levels. GPT-6.2 Sol has no paired work results here.
-
-In Luna’s `low` approval-replay runs, both arms passed all three
-collection-equality trials. The literal-regexp task passed 3/3 with plain OMP
-and 0/3 with Superpowers. None of the 49 comparable pairs across the two work
-cohorts gained a pass with Superpowers. These runs test the bundled workflow.
-Measuring the effect of an individual skill requires a separate paired test.
-
-### What skill results tell you
-
-A skill floor is the lowest tested model that passed a skill's checks at the
-given effort.
-
-Luna passed the calibration for `brainstorming` at `low` and for
-`verification-before-completion` at `xhigh`. Each result covers one positive case,
-one near miss, and three held-out repetitions. Fourteen `xhigh` skill floors
-remain unverified. All 12 Terra trials in the final skill retry batch reached a
-time or spend limit, so that batch has no completed Terra skill verdicts.
-
-For your own comparison, start with the model you already use and follow
-[Evals](#evals). Keep model, route, thinking level, and budget fixed within each
-pair. Judge task outcomes and rework alongside elapsed time and estimated cost.
 
 ## Remove
 
@@ -118,6 +98,55 @@ and run the verification commands above after updating. [UPSTREAM.md](UPSTREAM.m
 records the exact Superpowers revision shipped by the adapter.
 
 ## Evals
+
+<details>
+<summary>See the test results and model settings</summary>
+
+Each comparison had two runs: one with OMP alone and one with Superpowers. We
+kept the model, provider, thinking setting, starting files, and limits the same
+for both. In the runs with scripted replies, we supplied prepared answers to
+approval questions in OMP’s print mode.
+
+Each cell shows how many runs passed the automated checks, **OMP alone → with
+Superpowers**.
+
+| Model | Thinking | Scripted replies | No replies |
+| --- | --- | --- | --- |
+| GPT-6 Luna | `low` | 14/16 → 10/16 | 8/11 → 2/11 |
+| GPT-6 Luna | `xhigh` | 2/3 → 0/3 | 5/9 → 0/9 |
+| GPT-6.1 Terra | `xhigh` | 1/2 → 0/2 | 1/8 → 0/8 |
+
+The [Luna `low` tests](https://github.com/piyushmor/superpowers-omp/issues/3)
+covered six small tasks. With Superpowers, the median run took 11.2 seconds
+longer with scripted replies and 5.3 seconds longer without them. Estimated
+cost was about 1.9 times as high. In the scripted runs, both approaches passed
+all three trials for comparing collections. On a task about matching literal
+text, OMP alone passed all three trials and Superpowers passed none.
+
+The [Luna and Terra `xhigh` tests](https://github.com/piyushmor/superpowers-omp/issues/4)
+repeated some tasks and added a change across several files. Runs in both groups
+hit time or cost limits. The samples are small and the tasks differ, which
+limits comparisons across models and settings. There are no paired work results
+for GPT-6.2 Sol. These tests cover the full workflow; a separate test would be
+needed to measure what changes when you add just one skill.
+
+We also checked how well models followed individual skills. Luna passed the
+checks for `brainstorming` at `low` and `verification-before-completion` at
+`xhigh`. Each result includes a positive case, a near miss, and three additional
+trials. The lowest suitable model is still unverified for 14 skills at `xhigh`.
+All 12 Terra trials in the last skill batch hit a time or cost limit.
+
+To start OMP with a specific model and thinking setting, set `MODEL` to the
+model’s exact name in your OMP setup, then run:
+
+```bash
+omp --model "$MODEL" --thinking xhigh
+```
+
+For your own comparison, keep the settings and budget the same for both runs.
+Compare what worked, what needed fixing, how long it took, and what it cost.
+
+</details>
 
 From a source checkout, validate coverage without a model call:
 
