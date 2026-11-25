@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { aggregate, check, experimentalPairs, parseEvents, safePath } from "../evals/core.ts";
+import { aggregate, check, classifyTurn, experimentalPairs, parseEvents, safePath } from "../evals/core.ts";
 
 const stream = (events: unknown[]) => events.map(event => JSON.stringify(event)).join("\n");
 
@@ -52,4 +52,23 @@ test("fixture paths cannot target Git metadata or escape the workspace", () => {
   for (const value of ["/tmp/file", "../file", "src/../file", ".git/config", "src\\file", ""]) {
     expect(safePath(value)).toBe(false);
   }
+});
+
+test("a recovered 429 can be scored and its failed attempt remains visible", () => {
+  const actual = parseEvents(stream([
+    { type: "message_end", message: { role: "assistant", stopReason: "error", errorMessage: "429 status code (no body) retry-after-ms=1000" } },
+    { type: "message_end", message: { role: "assistant", stopReason: "stop" } },
+    { type: "agent_end" },
+  ]));
+  expect(actual.errors).toHaveLength(1);
+  expect(classifyTurn(actual, 0, false)).toBe("scorable");
+  expect(classifyTurn(actual, 1, false)).toBe("invalid");
+});
+
+test("a hard provider cap stops new trials and a verified deadline is a budget outcome", () => {
+  const capped = parseEvents(stream([{ type: "message_end", message: { role: "assistant", stopReason: "error", errorMessage: "429 You have exceeded your monthly spend cap." } }]));
+  const deadline = parseEvents(stream([{ type: "message_end", message: { role: "assistant", stopReason: "aborted", errorMessage: "Deadline exceeded" } }]));
+  expect(classifyTurn(capped, 1, false)).toBe("quota");
+  expect(classifyTurn(deadline, 143, false)).toBe("budget");
+  expect(classifyTurn(parseEvents("unparseable JSON"), 0, false)).toBe("invalid");
 });

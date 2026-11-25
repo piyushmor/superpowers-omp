@@ -12,7 +12,7 @@ export type SkillCase = { id: string; skill: string; kind: "positive" | "near-mi
 export type WorkCase = { id: string; title: string; prompt: string; source: { url: string; commit: string }; files: Record<string, string>; allowedChanges: string[]; grader: string; answers?: string[] };
 export type Tool = { name: string; args: Record<string, unknown>; error?: boolean };
 export type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number; total: number };
-export type Trace = { tools: Tool[]; answer: string; errors: string[]; usage: Usage; complete: boolean; routes: string[] };
+export type Trace = { tools: Tool[]; answer: string; errors: string[]; usage: Usage; complete: boolean; routes: string[]; finalReason: string | null; protocolErrors: number; hardQuota: boolean; deadline: boolean };
 export type PairRow = { pair: string; mode: Mode; arm: Arm; valid: boolean; passed: boolean; ms: number; tokens: number };
 
 export function safePath(path: string): boolean {
@@ -28,10 +28,15 @@ export function parseEvents(jsonl: string): Trace {
   const usage: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, total: 0 };
   let answer = "";
   let complete = false;
+  let finalReason: string | null = null;
+  let protocolErrors = 0;
+  let hardQuota = false;
+  let deadline = false;
   for (const line of jsonl.split("\n")) {
     if (!line.trim()) continue;
     let event;
-    try { event = JSON.parse(line); } catch { errors.push("Malformed OMP event"); continue; }
+    try { event = JSON.parse(line); } catch { protocolErrors++; continue; }
+    if (!event || typeof event.type !== "string") { protocolErrors++; continue; }
     if (event.type === "agent_end") complete = true;
     if (event.type === "tool_execution_start") {
       const entry: Tool = { name: event.toolName, args: event.args ?? {} };
@@ -45,7 +50,13 @@ export function parseEvents(jsonl: string): Trace {
     const message = event.message;
     if (event.type !== "message_end" || message?.role !== "assistant") continue;
     if (message.provider && message.model) routes.add(`${message.provider}/${message.model}`);
-    if (message.stopReason === "error" || message.stopReason === "aborted") errors.push(message.errorMessage ?? message.stopReason);
+    finalReason = message.stopReason ?? null;
+    if (finalReason === "error" || finalReason === "aborted") {
+      const reason = String(message.errorMessage ?? finalReason);
+      errors.push(reason);
+      if (/exceeded your monthly spend cap/i.test(reason)) hardQuota = true;
+      if (finalReason === "aborted" && /^deadline exceeded$/i.test(reason)) deadline = true;
+    }
     if (Array.isArray(message.content)) {
       const text = message.content.filter((block: { type?: string }) => block.type === "text").map((block: { text: string }) => block.text).join("\n");
       if (text.trim()) answer = text;
@@ -57,7 +68,13 @@ export function parseEvents(jsonl: string): Trace {
     }
   }
   usage.total = usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
-  return { tools, answer, errors, usage, complete, routes: [...routes] };
+  return { tools, answer, errors, usage, complete, routes: [...routes], finalReason, protocolErrors, hardQuota, deadline };
+}
+
+export function classifyTurn(trace: Trace, exit: number | null, timedOut: boolean): "scorable" | "budget" | "quota" | "invalid" {
+  if (trace.hardQuota) return "quota";
+  if (timedOut || exit === 3 || (trace.deadline && trace.finalReason === "aborted")) return "budget";
+  return exit === 0 && trace.complete && trace.finalReason === "stop" && trace.protocolErrors === 0 ? "scorable" : "invalid";
 }
 
 export function check(rule: Check, trace: Trace, files: Record<string, string>, changed: string[] = []): boolean {

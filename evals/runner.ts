@@ -93,17 +93,24 @@ for (const provider of new Set(models.map(model => model.split("/", 1)[0]))) {
   }
 }
 
+let quotaStop = false;
+
 async function trial(id: string, model: string, arm: "plain" | "superpowers", mode: Mode) {
   const job = Bun.spawn([process.execPath, import.meta.path, "_trial", JSON.stringify({ id, options: { model, arm, mode, output: actualOutput, agentDir, dollars, seconds } })], { stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, code] = await Promise.all([new Response(job.stdout).text(), new Response(job.stderr).text(), job.exited]);
   if (code !== 0) throw new Error(`Trial ${id} failed to start: ${stderr.split("\n").slice(0, 4).join("\n")}`);
-  return JSON.parse(stdout) as TrialResult;
+  const result = JSON.parse(stdout) as TrialResult;
+  if (result.hardQuota && !quotaStop) {
+    quotaStop = true;
+    console.error("Provider hard cap reached. Active trials can finish; pending trials will remain unstarted.");
+  }
+  return result;
 }
 
 async function parallelQueue<T>(items: T[], action: (item: T) => Promise<void>) {
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(items.length, jobs) }, async () => {
-    while (next < items.length) {
+    while (!quotaStop && next < items.length) {
       const item = items[next++];
       try { await action(item); } catch (error) {
         console.error(String(error));
@@ -117,6 +124,7 @@ if (command === "work") {
   const rows: Array<PairRow & TrialResult> = [];
   await parallelQueue(pairs, async pair => {
     for (const arm of pair.arms) {
+      if (quotaStop) break;
       const result = await trial(pair.id, models[0], arm, pair.mode);
       rows.push({ ...result, pair: pair.pair });
     }
@@ -130,9 +138,11 @@ if (command === "work") {
     const cases = skills.filter(fixture => fixture.skill === name);
     const row: (typeof floors)[string] = { lowestValidated: null, attempts: [] };
     for (const [tier, model] of models.entries()) {
+      if (quotaStop) break;
       const runs: TrialResult[] = [];
       row.attempts.push({ model, runs });
       for (const kind of ["positive", "near-miss"] as const) {
+        if (quotaStop) break;
         const fixture = cases.find(candidate => candidate.kind === kind)!;
         const result = await trial(fixture.id, model, "superpowers", "unattended");
         runs.push(result);
@@ -142,6 +152,7 @@ if (command === "work") {
       if (tier > 0 && !calibrated) continue;
       const holdout = cases.find(candidate => candidate.kind === "holdout")!;
       for (let repeat = 0; repeat < (calibrated ? repeats : 1); repeat++) {
+        if (quotaStop) break;
         const result = await trial(holdout.id, model, "superpowers", "unattended");
         runs.push(result);
         if (!result.valid || !result.passed) break;

@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { check, parseEvents, safePath, type Arm, type Check, type Mode, type SkillCase, type Usage, type WorkCase } from "./core.ts";
+import { check, classifyTurn, parseEvents, safePath, type Arm, type Check, type Mode, type SkillCase, type Usage, type WorkCase } from "./core.ts";
 
 const root = resolve(import.meta.dir, "..");
 // Use native subagents in skill calibration. Work pairs use a single measured model.
@@ -13,6 +13,7 @@ export type TrialResult = {
   case: string; model: string; arm: Arm; mode: Mode; trial: string; ms: number; tokens: number; usage: Usage;
   valid: boolean; passed: boolean; errors: string[]; budgetStop: boolean; gate: 0 | 1 | 2 | null; approvalTurns: number;
   changed: string[]; outOfScope: string[]; checks: { rule: Check; passed: boolean }[]; graderExit: number | null;
+  hardQuota: boolean; recoveredProviderErrors: number;
 };
 type Snapshot = Record<string, string>;
 
@@ -91,12 +92,14 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
   const launchWrite = [workspace, temporary, sessions, agentDir].map(path => `(subpath ${JSON.stringify(path)})`).join(" ");
   const profileHeader = `(version 1)\n(allow default)\n(deny file-write*)\n`;
   const hideResults = `(deny file-read* (subpath ${JSON.stringify(options.output)}))\n(allow file-read* (subpath ${JSON.stringify(trial)}))\n`;
-  writeFileSync(launchProfile, `${profileHeader}(allow file-write* ${launchWrite} (literal "/dev/null"))\n${hideResults}(deny file-read* (subpath ${JSON.stringify(root)}) (subpath ${JSON.stringify(options.agentDir)}))\n`);
+  const ambientMcp = resolve(process.env.HOME ?? "", ".omp/agent/mcp.json");
+  const blockedMcp = [...new Set([ambientMcp, ...(existsSync(ambientMcp) ? [realpathSync(ambientMcp)] : [])])].map(path => `(literal ${JSON.stringify(path)})`).join(" ");
+  writeFileSync(launchProfile, `${profileHeader}(allow file-write* ${launchWrite} (literal "/dev/null"))\n${hideResults}(deny file-read* (subpath ${JSON.stringify(root)}) (subpath ${JSON.stringify(options.agentDir)}) ${blockedMcp})\n`);
   writeFileSync(gradeProfile, `${profileHeader}(allow file-write* (subpath ${JSON.stringify(trial)}) (literal "/dev/null"))\n${hideResults}(deny network*)\n(deny file-read* (subpath ${JSON.stringify(agentDir)}) (subpath ${JSON.stringify(options.agentDir)}))\n`);
   const launcher = "/usr/bin/sandbox-exec";
   const boundary = spawnSync(launcher, ["-f", launchProfile, "/bin/sh", "-c",
-    'cat "$1" >/dev/null && ! cat "$2" 2>/dev/null && ! cat "$3" 2>/dev/null', "probe",
-    join(runtime, "observe.ts"), join(root, "evals", "work-cases.json"), join(options.output, "matrix.json"),
+    'cat "$1" >/dev/null && ! cat "$2" 2>/dev/null && ! cat "$3" 2>/dev/null && ! cat "$4" 2>/dev/null', "probe",
+    join(runtime, "observe.ts"), join(root, "evals", "work-cases.json"), join(options.output, "matrix.json"), ambientMcp,
   ], { cwd: workspace, env: settings, encoding: "utf8" });
   if (boundary.status !== 0) throw new Error("Isolation canary could read protected benchmark inputs or could not read the runtime");
   const tools = "grader" in fixture ? workTools : `${workTools},task`;
@@ -110,6 +113,8 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
   let prompt = fixture.prompt;
   let gate: 0 | 1 | 2 | null = null;
   let budgetStop = false;
+  let hardQuota = false;
+  let recoveredProviderErrors = 0;
   let spent = 0;
   const work = "grader" in fixture ? fixture : undefined;
   for (let turn = 0; turn < 4; turn++) {
@@ -125,13 +130,14 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
     writeFileSync(join(trial, `turn-${turn}.stdout.jsonl`), log);
     writeFileSync(join(trial, `turn-${turn}.stderr`), proc.stderr ?? "");
     spent += tail.usage.cost;
-    if (proc.status === 3 || proc.error?.code === "ETIMEDOUT") {
-      budgetStop = true;
-      if (turn === 0 && (!tail.routes.length || !(proc.stderr ?? "").includes(`SUPERPOWERS_EVAL_BOOTSTRAP_COUNT=${options.arm === "superpowers" ? 1 : 0}`))) errors.push("Budget stopped before treatment was verified");
+    const status = classifyTurn(tail, proc.status, proc.error?.code === "ETIMEDOUT");
+    if (status === "quota") {
+      hardQuota = true;
+      errors.push(`Turn ${turn + 1}: provider hard spend cap`);
       break;
     }
-    if (proc.status !== 0 || !tail.complete || tail.errors.length) {
-      errors.push(`Turn ${turn + 1} invalid (exit=${proc.status}, complete=${tail.complete}, providerErrors=${tail.errors.length})`);
+    if (status === "invalid") {
+      errors.push(`Turn ${turn + 1} invalid (exit=${proc.status}, complete=${tail.complete}, providerErrors=${tail.errors.length}, protocolErrors=${tail.protocolErrors})`);
       break;
     }
     const bootstrap = [...(proc.stderr ?? "").matchAll(/^SUPERPOWERS_EVAL_BOOTSTRAP_COUNT=(\d+)$/gm)].map(match => Number(match[1]));
@@ -143,6 +149,8 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
       errors.push(`Turn ${turn + 1} used unexpected model routing: ${tail.routes.join(",") || "missing"}`);
       break;
     }
+    if (status === "budget") { budgetStop = true; break; }
+    recoveredProviderErrors += tail.errors.length;
     gate = replaySlot(tail.answer);
     if (options.mode === "unattended" || gate === null || turn === 3) break;
     prompt = work?.answers?.[gate] || defaultAnswers[gate];
@@ -179,7 +187,7 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
   }
   const valid = errors.length === 0;
   const passed = valid && !budgetStop && (work ? graderExit === 0 : checks.every(result => result.passed));
-  const result = { case: fixture.id, model: options.model, arm: options.arm, mode: options.mode, trial, ms, tokens: trace.usage.total, usage: trace.usage, valid, passed, errors, budgetStop, gate, approvalTurns: answers.length, changed, outOfScope, checks, graderExit };
+  const result = { case: fixture.id, model: options.model, arm: options.arm, mode: options.mode, trial, ms, tokens: trace.usage.total, usage: trace.usage, valid, passed, errors, budgetStop, gate, approvalTurns: answers.length, changed, outOfScope, checks, graderExit, hardQuota, recoveredProviderErrors };
   writeFileSync(join(trial, "result.json"), JSON.stringify(result, null, 2) + "\n");
   return result;
 }
