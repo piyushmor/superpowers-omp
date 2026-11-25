@@ -1,0 +1,136 @@
+[
+	{
+		"id": "dequal-set-map-duplicates",
+		"title": "Fix dequal Set/Map equality with repeated object members",
+		"prompt": "This is a copy of the `dequal` deep-equality library (src/index.js). It reports some Sets and Maps as equal when they are not: for example a Set containing two equal-looking objects compares equal to a Set containing two different objects, and Maps with object keys have the same problem. Fix it so Set and Map comparison is correct, keeping the existing exports and the behavior for everything that is already right (order-insensitive Sets and Maps of objects must still compare equal).",
+		"source": {
+			"url": "https://github.com/lukeed/dequal",
+			"commit": "37c21f675c1f538f2d4b63ebf19a161411e7a5fd"
+		},
+		"files": {
+			"src/index.js": "var has = Object.prototype.hasOwnProperty;\n\nfunction find(iter, tar, key) {\n\tfor (key of iter.keys()) {\n\t\tif (dequal(key, tar)) return key;\n\t}\n}\n\nexport function dequal(foo, bar) {\n\tvar ctor, len, tmp;\n\tif (foo === bar) return true;\n\n\tif (foo && bar && (ctor=foo.constructor) === bar.constructor) {\n\t\tif (ctor === Date) return foo.getTime() === bar.getTime();\n\t\tif (ctor === RegExp) return foo.toString() === bar.toString();\n\n\t\tif (ctor === Array) {\n\t\t\tif ((len=foo.length) === bar.length) {\n\t\t\t\twhile (len-- && dequal(foo[len], bar[len]));\n\t\t\t}\n\t\t\treturn len === -1;\n\t\t}\n\n\t\tif (ctor === Set) {\n\t\t\tif (foo.size !== bar.size) {\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\tfor (len of foo) {\n\t\t\t\ttmp = len;\n\t\t\t\tif (tmp && typeof tmp === 'object') {\n\t\t\t\t\ttmp = find(bar, tmp);\n\t\t\t\t\tif (!tmp) return false;\n\t\t\t\t}\n\t\t\t\tif (!bar.has(tmp)) return false;\n\t\t\t}\n\t\t\treturn true;\n\t\t}\n\n\t\tif (ctor === Map) {\n\t\t\tif (foo.size !== bar.size) {\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\tfor (len of foo) {\n\t\t\t\ttmp = len[0];\n\t\t\t\tif (tmp && typeof tmp === 'object') {\n\t\t\t\t\ttmp = find(bar, tmp);\n\t\t\t\t\tif (!tmp) return false;\n\t\t\t\t}\n\t\t\t\tif (!dequal(len[1], bar.get(tmp))) {\n\t\t\t\t\treturn false;\n\t\t\t\t}\n\t\t\t}\n\t\t\treturn true;\n\t\t}\n\n\t\tif (ctor === ArrayBuffer) {\n\t\t\tfoo = new Uint8Array(foo);\n\t\t\tbar = new Uint8Array(bar);\n\t\t} else if (ctor === DataView) {\n\t\t\tif ((len=foo.byteLength) === bar.byteLength) {\n\t\t\t\twhile (len-- && foo.getInt8(len) === bar.getInt8(len));\n\t\t\t}\n\t\t\treturn len === -1;\n\t\t}\n\n\t\tif (ArrayBuffer.isView(foo)) {\n\t\t\tif ((len=foo.byteLength) === bar.byteLength) {\n\t\t\t\twhile (len-- && foo[len] === bar[len]);\n\t\t\t}\n\t\t\treturn len === -1;\n\t\t}\n\n\t\tif (!ctor || typeof foo === 'object') {\n\t\t\tlen = 0;\n\t\t\tfor (ctor in foo) {\n\t\t\t\tif (has.call(foo, ctor) && ++len && !has.call(bar, ctor)) return false;\n\t\t\t\tif (!(ctor in bar) || !dequal(foo[ctor], bar[ctor])) return false;\n\t\t\t}\n\t\t\treturn Object.keys(bar).length === len;\n\t\t}\n\t}\n\n\treturn foo !== foo && bar !== bar;\n}\n",
+			"package.json": "{\"name\":\"dequal\",\"private\":true,\"type\":\"module\"}\n"
+		},
+		"allowedChanges": [
+			"src/index.js"
+		],
+		"grader": "evals/work-graders/dequal-set-map-duplicates.test.mjs",
+		"answers": [
+			"Yes, treat Set members and Map keys that are objects as needing a one-to-one match with the other side. Keep it dependency-free and keep the file plain ESM.",
+			"Sounds good. Please keep the fix small and do not change how arrays, dates, regexps or typed arrays compare.",
+			"That plan is fine, go ahead and make the change."
+		]
+	},
+	{
+		"id": "clsx-unique",
+		"title": "Add clsxUnique to clsx",
+		"prompt": "This is a copy of the `clsx` class-name helper (src/index.js). Add a named export `clsxUnique(...args)` that accepts the same kinds of arguments as `clsx` (strings, numbers, arrays, objects, falsy values) but returns each whitespace-separated class token only once, in first-seen order, joined by single spaces. Tokens are case-sensitive. Leading, trailing and repeated whitespace are ignored, including inside object keys (an object key like \"a b\" contributes tokens \"a\" and \"b\"). `clsx` and the default export must behave exactly as before.",
+		"source": {
+			"url": "https://github.com/lukeed/clsx",
+			"commit": "925494cf31bcd97d3337aacd34e659e80cae7fe2"
+		},
+		"files": {
+			"src/index.js": "function toVal(mix) {\n\tvar k, y, str='';\n\n\tif (typeof mix === 'string' || typeof mix === 'number') {\n\t\tstr += mix;\n\t} else if (typeof mix === 'object') {\n\t\tif (Array.isArray(mix)) {\n\t\t\tvar len=mix.length;\n\t\t\tfor (k=0; k < len; k++) {\n\t\t\t\tif (mix[k]) {\n\t\t\t\t\tif (y = toVal(mix[k])) {\n\t\t\t\t\t\tstr && (str += ' ');\n\t\t\t\t\t\tstr += y;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t} else {\n\t\t\tfor (y in mix) {\n\t\t\t\tif (mix[y]) {\n\t\t\t\t\tstr && (str += ' ');\n\t\t\t\t\tstr += y;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\treturn str;\n}\n\nexport function clsx() {\n\tvar i=0, tmp, x, str='', len=arguments.length;\n\tfor (; i < len; i++) {\n\t\tif (tmp = arguments[i]) {\n\t\t\tif (x = toVal(tmp)) {\n\t\t\t\tstr && (str += ' ');\n\t\t\t\tstr += x\n\t\t\t}\n\t\t}\n\t}\n\treturn str;\n}\n\nexport default clsx;\n",
+			"package.json": "{\"name\":\"clsx\",\"private\":true,\"type\":\"module\"}\n"
+		},
+		"allowedChanges": [
+			"src/index.js"
+		],
+		"grader": "evals/work-graders/clsx-unique.test.mjs",
+		"answers": [
+			"Numbers count as tokens like in clsx, so 1 and \"1\" are the same token. Nothing else is special.",
+			"Yes, a single pass over a flattened token list is fine as long as clsx itself is untouched.",
+			"Looks good, go ahead."
+		]
+	},
+	{
+		"id": "escape-literal-regexp",
+		"title": "Add literalRegExp helper to escape-string-regexp",
+		"prompt": "This is a copy of `escape-string-regexp` (index.js). Add a named export `literalRegExp(string, options)` that returns a RegExp matching the given string literally. Options: `flags` (string, default none, passed to RegExp) and `wholeWord` (boolean, default false). With `wholeWord`, a match must not have a word character ([A-Za-z0-9_]) immediately before or after it, even if the string itself starts or ends with punctuation (so \"c++\" matches in \"learn c++ now\" but not in \"c++x\", and \".x\" does not match in \"a.x\"). A non-string `string` throws TypeError; invalid flags throw whatever RegExp throws. It must work with the `u` flag. The default export must stay unchanged.",
+		"source": {
+			"url": "https://github.com/sindresorhus/escape-string-regexp",
+			"commit": "a7f7dabaf336bda98d2166848af15d9168b10bcf"
+		},
+		"files": {
+			"index.js": "export default function escapeStringRegexp(string) {\n\tif (typeof string !== 'string') {\n\t\tthrow new TypeError('Expected a string');\n\t}\n\n\t// Escape characters with special meaning either inside or outside character sets.\n\t// Use a simple backslash escape when it’s always valid, and a `\\xnn` escape when the simpler form would be disallowed by Unicode patterns’ stricter grammar.\n\treturn string\n\t\t.replace(/[|\\\\{}()[\\]^$+*?.]/g, '\\\\$&')\n\t\t.replace(/-/g, '\\\\x2d');\n}\n",
+			"package.json": "{\"name\":\"esc\",\"private\":true,\"type\":\"module\"}\n"
+		},
+		"allowedChanges": [
+			"index.js"
+		],
+		"grader": "evals/work-graders/escape-literal-regexp.test.mjs",
+		"answers": [
+			"Lookbehind/lookahead is fine, we only run on modern runtimes. Reuse the existing escape function rather than duplicating it.",
+			"Yes, `wholeWord` is only about the characters directly adjacent to the match, nothing about the string contents.",
+			"Plan looks right, go ahead."
+		]
+	},
+	{
+		"id": "ms-format-rollover",
+		"title": "Fix ms formatting that shows 60m instead of 1h",
+		"prompt": "This is a JavaScript port of the `ms` duration library (src/ms.js). `format(3599999)` returns \"60m\" and `format(59500)` returns \"60s\" rather than rolling over to the next unit (\"1h\", \"1m\"). Fix `format` (short and long forms, positive and negative values) so a value that rounds up to the size of the next larger unit is shown in that unit, with pluralization following the unit actually shown (e.g. \"1 hour\"). Values that do not round up, sub-second values, `parse`, and the default export must stay as they are.",
+		"source": {
+			"url": "https://github.com/vercel/ms",
+			"commit": "4ff48cec099f0514c3e9bbca18706c9c21122bfb"
+		},
+		"files": {
+			"src/ms.js": "const s = 1000;\nconst m = s * 60;\nconst h = m * 60;\nconst d = h * 24;\nconst w = d * 7;\nconst y = d * 365.25;\nconst mo = y / 12;\n\nconst UNITS = {\n\ty, yr: y, yrs: y, year: y, years: y,\n\tmo, month: mo, months: mo,\n\tw, week: w, weeks: w,\n\td, day: d, days: d,\n\th, hr: h, hrs: h, hour: h, hours: h,\n\tm, min: m, mins: m, minute: m, minutes: m,\n\ts, sec: s, secs: s, second: s, seconds: s,\n\tms: 1, msec: 1, msecs: 1, millisecond: 1, milliseconds: 1,\n};\n\n// [size in ms, short suffix, long name], largest first.\nconst SCALES = [\n\t[y, 'y', 'year'],\n\t[mo, 'mo', 'month'],\n\t[w, 'w', 'week'],\n\t[d, 'd', 'day'],\n\t[h, 'h', 'hour'],\n\t[m, 'm', 'minute'],\n\t[s, 's', 'second'],\n];\n\nexport function parse(str) {\n\tif (typeof str !== 'string' || str.length === 0 || str.length > 100) {\n\t\tthrow new Error('Value provided to ms.parse() must be a string with length between 1 and 100');\n\t}\n\n\tconst match = /^(-?\\d*\\.?\\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mo|years?|yrs?|y)?$/i.exec(str);\n\tif (!match) {\n\t\treturn Number.NaN;\n\t}\n\n\treturn parseFloat(match[1]) * UNITS[(match[2] || 'ms').toLowerCase()];\n}\n\nfunction formatDuration(ms, long) {\n\tconst abs = Math.abs(ms);\n\tfor (const [size, short, name] of SCALES) {\n\t\tif (abs >= size) {\n\t\t\tconst count = Math.round(ms / size);\n\t\t\tif (!long) {\n\t\t\t\treturn `${count}${short}`;\n\t\t\t}\n\n\t\t\treturn `${count} ${name}${abs >= size * 1.5 ? 's' : ''}`;\n\t\t}\n\t}\n\n\treturn long ? `${ms} ms` : `${ms}ms`;\n}\n\nexport function format(ms, options) {\n\tif (typeof ms !== 'number' || !Number.isFinite(ms)) {\n\t\tthrow new Error('Value provided to ms.format() must be of type number.');\n\t}\n\n\treturn formatDuration(ms, Boolean(options && options.long));\n}\n\nexport default function ms(value, options) {\n\tif (typeof value === 'string') {\n\t\treturn parse(value);\n\t}\n\n\tif (typeof value === 'number') {\n\t\treturn format(value, options);\n\t}\n\n\tthrow new Error('Value provided to ms() must be a string or number.');\n}\n",
+			"package.json": "{\"name\":\"msfmt\",\"private\":true,\"type\":\"module\"}\n"
+		},
+		"allowedChanges": [
+			"src/ms.js"
+		],
+		"grader": "evals/work-graders/ms-format-rollover.test.mjs",
+		"answers": [
+			"Apply it to every unit boundary from seconds up to weeks. I do not care about rolling months into years.",
+			"Pluralization should follow the rule already in the code, evaluated for the unit that ends up displayed.",
+			"Fine, go ahead."
+		]
+	},
+	{
+		"id": "ms-cli-run-extraction",
+		"title": "Refactor the ms CLI so its logic is testable",
+		"prompt": "src/cli.js is a small command line wrapper around src/ms.js that reads process.argv, prints with console and calls process.exit directly, which makes it hard to test. Refactor it so the logic lives in an exported pure function `run(argv)` (argv excludes the node and script entries) returning `{code, stdout, stderr}` where stdout and stderr are the exact strings that would be printed, newline included. `run` must not touch console, process.argv or process.exit. `main()` and running the file as a script must behave exactly as they do now, apart from being built on `run`.",
+		"source": {
+			"url": "https://github.com/vercel/ms",
+			"commit": "4ff48cec099f0514c3e9bbca18706c9c21122bfb"
+		},
+		"files": {
+			"src/cli.js": "import ms from './ms.js';\n\nexport function main() {\n\tconst args = process.argv.slice(2);\n\n\tif (args.includes('--help')) {\n\t\tconsole.log('Usage: ms [--long] <value>...');\n\t\tprocess.exit(0);\n\t}\n\n\tif (args.length === 0) {\n\t\tconsole.error('Usage: ms [--long] <value>...');\n\t\tprocess.exit(1);\n\t}\n\n\tconst long = args.includes('--long');\n\tlet failed = false;\n\n\tfor (const arg of args.filter(a => a !== '--long')) {\n\t\tconst input = /^-?\\d+$/.test(arg) ? Number(arg) : arg;\n\t\ttry {\n\t\t\tconst result = ms(input, {long});\n\t\t\tif (typeof result === 'number' && Number.isNaN(result)) {\n\t\t\t\tconsole.error(`Invalid duration: ${arg}`);\n\t\t\t\tfailed = true;\n\t\t\t} else {\n\t\t\t\tconsole.log(result);\n\t\t\t}\n\t\t} catch (error) {\n\t\t\tconsole.error(error.message);\n\t\t\tfailed = true;\n\t\t}\n\t}\n\n\tprocess.exit(failed ? 1 : 0);\n}\n\nif (import.meta.main) {\n\tmain();\n}\n",
+			"src/ms.js": "const s = 1000;\nconst m = s * 60;\nconst h = m * 60;\nconst d = h * 24;\nconst w = d * 7;\nconst y = d * 365.25;\nconst mo = y / 12;\n\nconst UNITS = {\n\ty, yr: y, yrs: y, year: y, years: y,\n\tmo, month: mo, months: mo,\n\tw, week: w, weeks: w,\n\td, day: d, days: d,\n\th, hr: h, hrs: h, hour: h, hours: h,\n\tm, min: m, mins: m, minute: m, minutes: m,\n\ts, sec: s, secs: s, second: s, seconds: s,\n\tms: 1, msec: 1, msecs: 1, millisecond: 1, milliseconds: 1,\n};\n\n// [size in ms, short suffix, long name], largest first.\nconst SCALES = [\n\t[y, 'y', 'year'],\n\t[mo, 'mo', 'month'],\n\t[w, 'w', 'week'],\n\t[d, 'd', 'day'],\n\t[h, 'h', 'hour'],\n\t[m, 'm', 'minute'],\n\t[s, 's', 'second'],\n];\n\nexport function parse(str) {\n\tif (typeof str !== 'string' || str.length === 0 || str.length > 100) {\n\t\tthrow new Error('Value provided to ms.parse() must be a string with length between 1 and 100');\n\t}\n\n\tconst match = /^(-?\\d*\\.?\\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mo|years?|yrs?|y)?$/i.exec(str);\n\tif (!match) {\n\t\treturn Number.NaN;\n\t}\n\n\treturn parseFloat(match[1]) * UNITS[(match[2] || 'ms').toLowerCase()];\n}\n\nfunction formatDuration(ms, long) {\n\tconst abs = Math.abs(ms);\n\tfor (const [size, short, name] of SCALES) {\n\t\tif (abs >= size) {\n\t\t\tconst count = Math.round(ms / size);\n\t\t\tif (!long) {\n\t\t\t\treturn `${count}${short}`;\n\t\t\t}\n\n\t\t\treturn `${count} ${name}${abs >= size * 1.5 ? 's' : ''}`;\n\t\t}\n\t}\n\n\treturn long ? `${ms} ms` : `${ms}ms`;\n}\n\nexport function format(ms, options) {\n\tif (typeof ms !== 'number' || !Number.isFinite(ms)) {\n\t\tthrow new Error('Value provided to ms.format() must be of type number.');\n\t}\n\n\treturn formatDuration(ms, Boolean(options && options.long));\n}\n\nexport default function ms(value, options) {\n\tif (typeof value === 'string') {\n\t\treturn parse(value);\n\t}\n\n\tif (typeof value === 'number') {\n\t\treturn format(value, options);\n\t}\n\n\tthrow new Error('Value provided to ms() must be a string or number.');\n}\n",
+			"package.json": "{\"name\":\"mscli\",\"private\":true,\"type\":\"module\"}\n"
+		},
+		"allowedChanges": [
+			"src/cli.js"
+		],
+		"grader": "evals/work-graders/ms-cli-run-extraction.test.mjs",
+		"answers": [
+			"Keep the existing messages and ordering exactly: usage text for no args goes to stderr with code 1, --help goes to stdout with code 0.",
+			"Yes, stdout and stderr are the concatenation of what was logged, one newline per line. main should just write them and exit with the code.",
+			"Good, go ahead."
+		]
+	},
+	{
+		"id": "slash-regression-tests",
+		"title": "Write a regression test suite for slash",
+		"prompt": "index.js is the `slash` path helper (converts Windows backslash paths to forward slashes). There is no test suite yet. Write a thorough regression test suite in slash.test.js using `bun:test` that would catch realistic bugs introduced into index.js, covering its observable behavior and edge cases. Do not change index.js.",
+		"source": {
+			"url": "https://github.com/sindresorhus/slash",
+			"commit": "2e8a56bd8b2863be09d4fc85283c0e465131a6d3"
+		},
+		"files": {
+			"index.js": "export default function slash(path) {\n\tconst isExtendedLengthPath = path.startsWith('\\\\\\\\?\\\\');\n\n\tif (isExtendedLengthPath) {\n\t\treturn path;\n\t}\n\n\treturn path.replace(/\\\\/g, '/');\n}\n",
+			"slash.test.js": "// Tests for ./index.js go here. Run with `bun test`.\n",
+			"package.json": "{\"name\":\"slash\",\"private\":true,\"type\":\"module\"}\n"
+		},
+		"allowedChanges": [
+			"slash.test.js"
+		],
+		"grader": "evals/work-graders/slash-regression-tests.test.mjs",
+		"answers": [
+			"Cover Windows drive paths, UNC paths, mixed separators and the extended-length prefix. Tests must pass against the current implementation.",
+			"Think about what a careless refactor of the replace or the prefix check could break and assert on those.",
+			"That works, go ahead."
+		]
+	}
+]

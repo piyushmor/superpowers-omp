@@ -58,3 +58,30 @@ omp plugin install 'github:piyushmor/superpowers-omp#<adapter-commit>'
 Replace `<adapter-commit>` with the Git commit SHA. Start a fresh OMP session
 and run the verification commands above after updating. [UPSTREAM.md](UPSTREAM.md)
 records the exact Superpowers revision shipped by the adapter.
+
+## Evals
+
+From a source checkout, validate coverage without a model call:
+
+```bash
+bun run eval:check
+bun run eval work --models "$MODEL" --repeats 3
+```
+
+The second command previews the run matrix and per-session budget. Set `MODEL`
+to an exact current OMP selector. A live run needs macOS and a dedicated OMP
+model configuration using environment or token-helper access. Each trial gets a
+fresh profile without saved auth or memory state. Use trusted public fixtures:
+the agent needs provider access, and the hidden grader runs without networking.
+
+```bash
+bun run eval skills --models "$CHEAP,$MID,$STRONG" --run --agent-dir "$PROFILE" --output /tmp/omp-skill-eval
+bun run eval work --models "$MODEL" --run --agent-dir "$PROFILE" --output /tmp/omp-work-eval
+```
+
+Pass skill models in ascending cost order. A candidate must pass the positive
+and near-miss cases and all held-out repetitions to earn a floor. Work runs
+alternate with/without Superpowers using one measured model and report scripted
+interactive replay and unattended stops separately. Replay uses OMP print mode
+and native continuation. Terminal `ask` forms are outside this benchmark. Keep
+per-run transcripts local.

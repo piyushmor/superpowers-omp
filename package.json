@@ -6,5 +6,10 @@
   "license": "MIT",
   "keywords": ["omp", "oh-my-pi", "superpowers", "skills"],
   "omp": { "extensions": ["./extension.ts"] },
-  "scripts": { "test": "bun test" }
+  "files": ["extension.ts", "skills", "UPSTREAM.md"],
+  "scripts": {
+    "test": "bun test",
+    "eval:check": "bun evals/runner.ts check",
+    "eval": "bun evals/runner.ts"
+  }
 }
