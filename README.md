@@ -61,6 +61,12 @@ rechecked selected tasks and added a multi-file case. Time and spend limits
 affected both arms. The small samples and different task mixes limit comparisons
 across models and thinking levels. GPT-6.2 Sol has no paired work results here.
 
+In Luna’s `low` approval-replay runs, both arms passed all three
+collection-equality trials. The literal-regexp task passed 3/3 with plain OMP
+and 0/3 with Superpowers. None of the 49 comparable pairs across the two work
+cohorts gained a pass with Superpowers. These runs test the bundled workflow.
+Measuring the effect of an individual skill requires a separate paired test.
+
 ### What skill results tell you
 
 A skill floor is the lowest tested model that passed a skill's checks at the
