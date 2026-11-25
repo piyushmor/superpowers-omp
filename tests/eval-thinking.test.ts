@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -12,7 +12,7 @@ test("old preview commands still request low thinking", () => {
   expect(JSON.parse(result.stdout.toString()).thinking).toBe("low");
 });
 
-function withFakeOmp(levels: string[], exercise: (run: { output: string; exitCode: number; stderr: string }) => void) {
+function withFakeOmp(levels: string[], exercise: (run: { output: string; exitCode: number; stderr: string }) => void, largeTrace = false) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "omp-effort-test-")));
   try {
     const bin = join(dir, "bin"), home = join(dir, "home"), agent = join(dir, "agent");
@@ -32,11 +32,16 @@ for arg do
   esac
 done
 printf 'SUPERPOWERS_EVAL_BOOTSTRAP_COUNT=%s\\n' "$bootstrap" >&2
+if [ "$FIXTURE_LARGE_TRACE" = 1 ]; then
+  printf '%s' '{"type":"tool_execution_update","payload":"'
+  head -c 11534336 /dev/zero | tr '\\000' x
+  printf '"}\\n'
+fi
 printf '%s\\n' '{"type":"message_end","message":{"role":"assistant","provider":"fixture","model":"ambient-smoke","stopReason":"stop","content":[{"type":"text","text":"Fixture completed."}]}}' '{"type":"agent_end"}'
 `, { mode: 0o755 });
     const output = join(dir, "output");
     const result = Bun.spawnSync([...command, "--thinking", "xhigh", "--run", "--agent-dir", agent, "--output", output], {
-      cwd: repo, env: { PATH: `${bin}:${process.env.PATH}`, HOME: home, TMPDIR: dir },
+      cwd: repo, env: { PATH: `${bin}:${process.env.PATH}`, HOME: home, TMPDIR: dir, FIXTURE_LARGE_TRACE: largeTrace ? "1" : "0" },
     });
     exercise({ output, exitCode: result.exitCode, stderr: result.stderr.toString() });
   } finally {
@@ -64,4 +69,16 @@ test("an unsupported requested effort is rejected before creating trial artifact
     expect(stderr).toContain("fixture/ambient-smoke does not advertise xhigh thinking");
     expect(existsSync(output)).toBe(false);
   });
+});
+
+test.skipIf(process.platform !== "darwin")("a complete event stream survives a tool update larger than the old capture limit", () => {
+  withFakeOmp(["xhigh"], ({ exitCode, output }) => {
+    expect(exitCode).toBe(0);
+    const { rows } = JSON.parse(readFileSync(join(output, "work-results.json"), "utf8"));
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.valid).toBe(true);
+      expect(statSync(join(row.trial, "turn-0.stdout.jsonl")).size).toBeGreaterThan(11 * 1024 * 1024);
+    }
+  }, true);
 });

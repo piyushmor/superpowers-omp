@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { check, classifyTurn, parseEvents, safePath, type Arm, type Check, type Mode, type SkillCase, type ThinkingLevel, type Usage, type WorkCase } from "./core.ts";
 
@@ -122,14 +122,24 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
     const seconds = Math.floor(options.seconds - (Date.now() - started) / 1000);
     if (seconds < 1 || spent >= options.dollars) { budgetStop = true; break; }
     const args = [...common, ...variant, ...(turn ? ["--continue"] : []), `--max-time=${seconds}s`, `--max-cost=${options.dollars - spent}`, prompt];
-    const proc = spawnSync(launcher, ["-f", launchProfile, "omp", ...args], {
-      cwd: workspace, env: settings, encoding: "utf8", timeout: (seconds + 8) * 1000, maxBuffer: 10 * 1024 * 1024,
-    });
-    const log = proc.stdout ?? "";
+    const stdoutPath = join(trial, `turn-${turn}.stdout.jsonl`);
+    const stderrPath = join(trial, `turn-${turn}.stderr`);
+    const stdout = openSync(stdoutPath, "wx", 0o600);
+    let stderr: number | undefined;
+    let proc;
+    try {
+      stderr = openSync(stderrPath, "wx", 0o600);
+      proc = spawnSync(launcher, ["-f", launchProfile, "omp", ...args], {
+        cwd: workspace, env: settings, timeout: (seconds + 8) * 1000, stdio: ["ignore", stdout, stderr],
+      });
+    } finally {
+      closeSync(stdout);
+      if (stderr !== undefined) closeSync(stderr);
+    }
+    const log = readFileSync(stdoutPath, "utf8");
+    const diagnostics = readFileSync(stderrPath, "utf8");
     const tail = parseEvents(log);
     transcript.push(log);
-    writeFileSync(join(trial, `turn-${turn}.stdout.jsonl`), log);
-    writeFileSync(join(trial, `turn-${turn}.stderr`), proc.stderr ?? "");
     spent += tail.usage.cost;
     const status = classifyTurn(tail, proc.status, proc.error?.code === "ETIMEDOUT");
     if (status === "quota") {
@@ -141,7 +151,7 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
       errors.push(`Turn ${turn + 1} invalid (exit=${proc.status}, complete=${tail.complete}, providerErrors=${tail.errors.length}, protocolErrors=${tail.protocolErrors})`);
       break;
     }
-    const bootstrap = [...(proc.stderr ?? "").matchAll(/^SUPERPOWERS_EVAL_BOOTSTRAP_COUNT=(\d+)$/gm)].map(match => Number(match[1]));
+    const bootstrap = [...diagnostics.matchAll(/^SUPERPOWERS_EVAL_BOOTSTRAP_COUNT=(\d+)$/gm)].map(match => Number(match[1]));
     if (!bootstrap.length || bootstrap.some(count => count !== (options.arm === "superpowers" ? 1 : 0))) {
       errors.push(`Turn ${turn + 1} bootstrap telemetry mismatch (${bootstrap.join(",") || "missing"})`);
       break;
