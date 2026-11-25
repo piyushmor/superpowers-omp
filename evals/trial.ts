@@ -1,16 +1,16 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { check, classifyTurn, parseEvents, safePath, type Arm, type Check, type Mode, type SkillCase, type Usage, type WorkCase } from "./core.ts";
+import { check, classifyTurn, parseEvents, safePath, type Arm, type Check, type Mode, type SkillCase, type ThinkingLevel, type Usage, type WorkCase } from "./core.ts";
 
 const root = resolve(import.meta.dir, "..");
 // Use native subagents in skill calibration. Work pairs use a single measured model.
 const workTools = "read,glob,grep,write,edit,bash,todo";
 const constraints = "Work only with the disposable evaluation workspace. Keep changes in it. Use local files and tools only. Do not publish or contact external services. If a human decision is required, end this turn with the exact question.";
 
-export type TrialOptions = { model: string; arm: Arm; mode: Mode; output: string; agentDir: string; dollars: number; seconds: number };
+export type TrialOptions = { model: string; thinking?: ThinkingLevel; arm: Arm; mode: Mode; output: string; agentDir: string; dollars: number; seconds: number };
 export type TrialResult = {
-  case: string; model: string; arm: Arm; mode: Mode; trial: string; ms: number; tokens: number; usage: Usage;
+  case: string; model: string; thinking: ThinkingLevel; arm: Arm; mode: Mode; trial: string; ms: number; tokens: number; usage: Usage;
   valid: boolean; passed: boolean; errors: string[]; budgetStop: boolean; gate: 0 | 1 | 2 | null; approvalTurns: number;
   changed: string[]; outOfScope: string[]; checks: { rule: Check; passed: boolean }[]; graderExit: number | null;
   hardQuota: boolean; recoveredProviderErrors: number;
@@ -103,7 +103,8 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
   ], { cwd: workspace, env: settings, encoding: "utf8" });
   if (boundary.status !== 0) throw new Error("Isolation canary could read protected benchmark inputs or could not read the runtime");
   const tools = "grader" in fixture ? workTools : `${workTools},task`;
-  const common = ["-p", "--mode=json", "--no-extensions", "--no-rules", "--no-context-files", "--no-lsp", "--no-pty", "--no-prewalk", "--no-title", "--offline", "--wait-async", "--thinking=low", `--tools=${tools}`, `--model=${options.model}`, `--session-dir=${sessions}`, `--append-system-prompt=${constraints}`];
+  const thinking = options.thinking ?? "low";
+  const common = ["-p", "--mode=json", "--no-extensions", "--no-rules", "--no-context-files", "--no-lsp", "--no-pty", "--no-prewalk", "--no-title", "--offline", "--wait-async", `--thinking=${thinking}`, `--tools=${tools}`, `--model=${options.model}`, `--session-dir=${sessions}`, `--append-system-prompt=${constraints}`];
   const observer = ["-e", join(runtime, "observe.ts")];
   const variant = options.arm === "superpowers" ? ["-e", join(runtime, "extension.ts"), ...observer] : ["--no-skills", ...observer];
   const started = Date.now();
@@ -121,14 +122,24 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
     const seconds = Math.floor(options.seconds - (Date.now() - started) / 1000);
     if (seconds < 1 || spent >= options.dollars) { budgetStop = true; break; }
     const args = [...common, ...variant, ...(turn ? ["--continue"] : []), `--max-time=${seconds}s`, `--max-cost=${options.dollars - spent}`, prompt];
-    const proc = spawnSync(launcher, ["-f", launchProfile, "omp", ...args], {
-      cwd: workspace, env: settings, encoding: "utf8", timeout: (seconds + 8) * 1000, maxBuffer: 10 * 1024 * 1024,
-    });
-    const log = proc.stdout ?? "";
+    const stdoutPath = join(trial, `turn-${turn}.stdout.jsonl`);
+    const stderrPath = join(trial, `turn-${turn}.stderr`);
+    const stdout = openSync(stdoutPath, "wx", 0o600);
+    let stderr: number | undefined;
+    let proc;
+    try {
+      stderr = openSync(stderrPath, "wx", 0o600);
+      proc = spawnSync(launcher, ["-f", launchProfile, "omp", ...args], {
+        cwd: workspace, env: settings, timeout: (seconds + 8) * 1000, stdio: ["ignore", stdout, stderr],
+      });
+    } finally {
+      closeSync(stdout);
+      if (stderr !== undefined) closeSync(stderr);
+    }
+    const log = readFileSync(stdoutPath, "utf8");
+    const diagnostics = readFileSync(stderrPath, "utf8");
     const tail = parseEvents(log);
     transcript.push(log);
-    writeFileSync(join(trial, `turn-${turn}.stdout.jsonl`), log);
-    writeFileSync(join(trial, `turn-${turn}.stderr`), proc.stderr ?? "");
     spent += tail.usage.cost;
     const status = classifyTurn(tail, proc.status, proc.error?.code === "ETIMEDOUT");
     if (status === "quota") {
@@ -140,7 +151,7 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
       errors.push(`Turn ${turn + 1} invalid (exit=${proc.status}, complete=${tail.complete}, providerErrors=${tail.errors.length}, protocolErrors=${tail.protocolErrors})`);
       break;
     }
-    const bootstrap = [...(proc.stderr ?? "").matchAll(/^SUPERPOWERS_EVAL_BOOTSTRAP_COUNT=(\d+)$/gm)].map(match => Number(match[1]));
+    const bootstrap = [...diagnostics.matchAll(/^SUPERPOWERS_EVAL_BOOTSTRAP_COUNT=(\d+)$/gm)].map(match => Number(match[1]));
     if (!bootstrap.length || bootstrap.some(count => count !== (options.arm === "superpowers" ? 1 : 0))) {
       errors.push(`Turn ${turn + 1} bootstrap telemetry mismatch (${bootstrap.join(",") || "missing"})`);
       break;
@@ -187,7 +198,7 @@ export function runTrial(fixture: SkillCase | WorkCase, options: TrialOptions): 
   }
   const valid = errors.length === 0;
   const passed = valid && !budgetStop && (work ? graderExit === 0 : checks.every(result => result.passed));
-  const result = { case: fixture.id, model: options.model, arm: options.arm, mode: options.mode, trial, ms, tokens: trace.usage.total, usage: trace.usage, valid, passed, errors, budgetStop, gate, approvalTurns: answers.length, changed, outOfScope, checks, graderExit, hardQuota, recoveredProviderErrors };
+  const result = { case: fixture.id, model: options.model, thinking, arm: options.arm, mode: options.mode, trial, ms, tokens: trace.usage.total, usage: trace.usage, valid, passed, errors, budgetStop, gate, approvalTurns: answers.length, changed, outOfScope, checks, graderExit, hardQuota, recoveredProviderErrors };
   writeFileSync(join(trial, "result.json"), JSON.stringify(result, null, 2) + "\n");
   return result;
 }

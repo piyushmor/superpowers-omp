@@ -65,7 +65,7 @@ From a source checkout, validate coverage without a model call:
 
 ```bash
 bun run eval:check
-bun run eval work --models "$MODEL" --repeats 3
+bun run eval work --models "$MODEL" --thinking xhigh --repeats 3
 ```
 
 The second command previews the run matrix and per-session budget. Set `MODEL`
@@ -74,9 +74,13 @@ model configuration using environment or token-helper access. Each trial gets a
 fresh profile without saved auth or memory state. Use trusted public fixtures:
 the agent needs provider access, and the hidden grader runs without networking.
 
+Use `--thinking` to set and record the fixed effort for the run. The default is
+`low` to reproduce earlier evals. A live run checks that every selected model
+advertises the requested level; use `off` for a model without thinking support.
+
 ```bash
 bun run eval skills --models "$CHEAP,$MID,$STRONG" --run --agent-dir "$PROFILE" --output /tmp/omp-skill-eval
-bun run eval work --models "$MODEL" --run --agent-dir "$PROFILE" --output /tmp/omp-work-eval
+bun run eval work --models "$MODEL" --thinking xhigh --run --agent-dir "$PROFILE" --output /tmp/omp-work-eval
 ```
 
 Pass skill models in ascending cost order. A candidate must pass the positive
@@ -85,3 +89,7 @@ alternate with/without Superpowers using one measured model and report scripted
 interactive replay and unattended stops separately. Replay uses OMP print mode
 and native continuation. Terminal `ask` forms are outside this benchmark. Keep
 per-run transcripts local.
+
+Run `python3 evals/approval-smoke.py` for a provider-free check of OMP's native
+RPC UI write-permission and Ask-form responses. The smoke uses a loopback model
+and exercises approval, decline, and cancellation in isolated workspaces.

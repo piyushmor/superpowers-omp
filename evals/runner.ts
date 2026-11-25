@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { aggregate, experimentalPairs, safePath, type Mode, type PairRow, type SkillCase, type WorkCase } from "./core.ts";
+import { aggregate, experimentalPairs, safePath, thinkingLevels, type Mode, type PairRow, type SkillCase, type WorkCase } from "./core.ts";
 import { runTrial, validateAgentDir, type TrialOptions, type TrialResult } from "./trial.ts";
 
 const repo = resolve(import.meta.dir, "..");
@@ -44,6 +44,7 @@ if (command === "_trial") {
 const { values } = parseArgs({ args: Bun.argv.slice(3), options: {
   run: { type: "boolean", default: false },
   models: { type: "string" },
+  thinking: { type: "string", default: "low" },
   modes: { type: "string", default: "interactive,unattended" },
   case: { type: "string" },
   repeats: { type: "string", default: "3" },
@@ -59,7 +60,7 @@ if (command === "check") {
   console.log(JSON.stringify({ shippedSkills: shipped.length, skillCases: skills.length, workCases: work.length }, null, 2));
   process.exit(0);
 }
-if (command !== "skills" && command !== "work") throw new Error("Usage: bun evals/runner.ts check|skills|work [--run --models <exact selectors> --agent-dir <dedicated profile> --output <fresh dir>]");
+if (command !== "skills" && command !== "work") throw new Error("Usage: bun evals/runner.ts check|skills|work [--thinking <level> --run --models <exact selectors> --agent-dir <dedicated profile> --output <fresh dir>]");
 const repeats = Number(values.repeats);
 const jobs = Number(values.jobs);
 const seconds = Number(values.seconds);
@@ -69,34 +70,38 @@ const modes = [...new Set(values.modes.split(","))] as Mode[];
 if (!modes.length || !modes.every(mode => mode === "interactive" || mode === "unattended")) throw new Error("Invalid work modes");
 const models = [...new Set((values.models ?? "").split(",").filter(Boolean))];
 if (models.some(model => !/^[a-z0-9-]+\/[a-z0-9_.:/-]+$/i.test(model))) throw new Error("Use exact provider/model selectors");
+const thinking = thinkingLevels.find(level => level === values.thinking);
+if (!thinking) throw new Error(`Unknown thinking level: ${values.thinking}. Use ${thinkingLevels.join(", ")}.`);
 const selected = (command === "skills" ? shipped : work.map(fixture => fixture.id)).filter(id => !values.case || id === values.case);
 if (!selected.length) throw new Error(`No cases matched: ${values.case}`);
 const pairs = command === "work" ? experimentalPairs(selected, modes, repeats) : [];
 const countCap = command === "work" ? pairs.length * 2 : selected.length * Math.max(1, models.length) * (2 + repeats);
-const metadata = { command, cases: selected, modes, models, repeats, jobs, seconds, dollars, maxSessions: countCap, nominalCostCeiling: countCap * dollars };
+const metadata = { command, cases: selected, modes, models, thinking, repeats, jobs, seconds, dollars, maxSessions: countCap, nominalCostCeiling: countCap * dollars };
 console.log(JSON.stringify(metadata, null, 2));
 if (!values.run) process.exit(0);
 if (!models.length || !values["agent-dir"] || !values.output || (command === "work" && models.length !== 1)) throw new Error("Live runs require exact --models, --agent-dir, and fresh --output. Work pairs use one model per run.");
 const agentDir = validateAgentDir(values["agent-dir"]);
-const output = resolve(values.output);
-mkdirSync(output, { mode: 0o700 });
-const actualOutput = realpathSync(output);
 const env = { ...process.env, PI_CODING_AGENT_DIR: agentDir };
 const version = Bun.spawnSync(["omp", "--version"], { env }).stdout.toString().trim();
 const commit = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: repo }).stdout.toString().trim();
-writeFileSync(join(actualOutput, "matrix.json"), JSON.stringify({ ...metadata, version, adapterCommit: commit, startedAt: new Date().toISOString() }, null, 2) + "\n");
 for (const provider of new Set(models.map(model => model.split("/", 1)[0]))) {
   const result = Bun.spawnSync(["omp", "models", provider, "--kind", "all", "--json"], { env });
-  const catalog = result.exitCode === 0 ? JSON.parse(result.stdout.toString()).models as Array<{ selector: string }> : [];
+  const catalog = result.exitCode === 0 ? JSON.parse(result.stdout.toString()).models as Array<{ selector: string; thinking?: string[] }> : [];
   for (const model of models.filter(model => model.startsWith(`${provider}/`))) {
-    if (!catalog.some(entry => entry.selector === model)) throw new Error(`The dedicated profile cannot resolve ${model}`);
+    const entry = catalog.find(entry => entry.selector === model);
+    if (!entry) throw new Error(`The dedicated profile cannot resolve ${model}`);
+    if (thinking !== "off" && !entry.thinking?.includes(thinking)) throw new Error(`${model} does not advertise ${thinking} thinking`);
   }
 }
+const output = resolve(values.output);
+mkdirSync(output, { mode: 0o700 });
+const actualOutput = realpathSync(output);
+writeFileSync(join(actualOutput, "matrix.json"), JSON.stringify({ ...metadata, version, adapterCommit: commit, startedAt: new Date().toISOString() }, null, 2) + "\n");
 
 let quotaStop = false;
 
 async function trial(id: string, model: string, arm: "plain" | "superpowers", mode: Mode) {
-  const job = Bun.spawn([process.execPath, import.meta.path, "_trial", JSON.stringify({ id, options: { model, arm, mode, output: actualOutput, agentDir, dollars, seconds } })], { stdout: "pipe", stderr: "pipe" });
+  const job = Bun.spawn([process.execPath, import.meta.path, "_trial", JSON.stringify({ id, options: { model, thinking, arm, mode, output: actualOutput, agentDir, dollars, seconds } })], { stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, code] = await Promise.all([new Response(job.stdout).text(), new Response(job.stderr).text(), job.exited]);
   if (code !== 0) throw new Error(`Trial ${id} failed to start: ${stderr.split("\n").slice(0, 4).join("\n")}`);
   const result = JSON.parse(stdout) as TrialResult;

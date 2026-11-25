@@ -1,6 +1,8 @@
 export type Arm = "plain" | "superpowers";
 export type Mode = "interactive" | "unattended";
-export type ToolMatch = { tool: string; contains?: string };
+export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type ThinkingLevel = (typeof thinkingLevels)[number];
+export type ToolMatch = { tool: string; contains?: string; error?: boolean };
 export type Check =
   | ({ kind: "tool"; min?: number; max?: number } & ToolMatch)
   | { kind: "order"; first: ToolMatch; then: ToolMatch }
@@ -78,7 +80,9 @@ export function classifyTurn(trace: Trace, exit: number | null, timedOut: boolea
 }
 
 export function check(rule: Check, trace: Trace, files: Record<string, string>, changed: string[] = []): boolean {
-  const matches = (call: Tool, expect: ToolMatch) => call.name === expect.tool && (expect.contains === undefined || JSON.stringify(call.args).includes(expect.contains));
+  const matches = (call: Tool, expected: ToolMatch) => call.name === expected.tool &&
+    (expected.contains === undefined || JSON.stringify(call.args).includes(expected.contains)) &&
+    (expected.error === undefined || call.error === expected.error);
   switch (rule.kind) {
     case "tool": {
       const count = trace.tools.filter(tool => matches(tool, rule)).length;

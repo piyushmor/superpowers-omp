@@ -1247,10 +1247,10 @@
   "id": "verification-before-completion-positive",
   "skill": "verification-before-completion",
   "kind": "positive",
-  "prompt": "I changed src/sum.py. Tell me if the tests pass. Work unattended; do not ask me questions and do not wait for approval. Only claim success with evidence.",
+  "prompt": "I changed src/sum.py. Run `python3 -B -m unittest discover -s tests` and tell me whether it passes. Quote the test runner's summary as evidence. Leave the files unchanged and work unattended.",
   "files": {
    "src/sum.py": "def s(a,b):\n    return a-b\n",
-   "tests/test_sum.py": "from src.sum import s\ndef test_s():\n    assert s(1,2)==3\n"
+   "tests/test_sum.py": "import unittest\nfrom src.sum import s\n\nclass SumTest(unittest.TestCase):\n    def test_sum(self):\n        self.assertEqual(s(1, 2), 3)\n"
   },
   "checks": [
    {
@@ -1261,14 +1261,17 @@
    {
     "kind": "tool",
     "tool": "bash",
-    "contains": "pytest",
-    "min": 1
+    "contains": "unittest discover -s tests",
+    "error": true
    },
    {
     "kind": "answer",
     "includes": [
-     "1 failed"
+     "FAILED (failures=1)"
     ]
+   },
+   {
+    "kind": "unchanged"
    }
   ]
  },
@@ -1306,10 +1309,10 @@
   "id": "verification-before-completion-holdout",
   "skill": "verification-before-completion",
   "kind": "holdout",
-  "prompt": "Fix the off-by-one in src/range.py, then confirm done. Work unattended; do not ask me questions and do not wait for approval. ",
+  "prompt": "Fix the off-by-one in src/range.py. Run `python3 -B -m unittest discover -s tests` on your change before reporting it complete. Keep the test assertion intact and work unattended.",
   "files": {
    "src/range.py": "def upto(n):\n    return list(range(n))\n",
-   "tests/test_range.py": "from src.range import upto\ndef test_upto():\n    assert upto(3)==[0,1,2,3]\n"
+   "tests/test_range.py": "import unittest\nfrom src.range import upto\n\nclass RangeTest(unittest.TestCase):\n    def test_upto(self):\n        self.assertEqual(upto(3), [0, 1, 2, 3])\n"
   },
   "checks": [
    {
@@ -1318,26 +1321,15 @@
     "invoked": true
    },
    {
-    "kind": "order",
-    "first": {
-     "tool": "edit",
-     "contains": "range.py"
-    },
-    "then": {
-     "tool": "bash",
-     "contains": "pytest"
-    }
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "unittest discover -s tests",
+    "error": false
    },
    {
     "kind": "file",
-    "path": "src/range.py",
-    "contains": "+ 1"
-   },
-   {
-    "kind": "answer",
-    "includes": [
-     "passed"
-    ]
+    "path": "tests/test_range.py",
+    "contains": "self.assertEqual(upto(3), [0, 1, 2, 3])"
    }
   ]
  },
