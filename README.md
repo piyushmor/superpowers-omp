@@ -8,25 +8,21 @@ Native OMP adapter for the [Superpowers](https://github.com/obra/superpowers) sk
 omp plugin install github:piyushmor/superpowers-omp
 ```
 
-## Verify
+## Verify and troubleshoot
+
+These checks need no model call:
 
 ```bash
 omp plugin list --json
+omp read skill://using-superpowers/references/omp-tools.md
 ```
 
-Start a clean OMP session and send:
+The first command lists `@piyushmor/superpowers-omp` as enabled. The second
+reports the file path OMP resolved. If it points to another Superpowers copy,
+check your user and project skills and disable the duplicate you do not want.
+Start a new OMP session after changing the installation.
 
-> Let's make a react todo list
-
-`brainstorming` must be read before code or implementation actions.
-
-To check the bootstrap without installing, load the extension for one run:
-
-```bash
-omp -p --no-session -e ./extension.ts 'Quote the line in your context that contains "superpowers:using-superpowers bootstrap for omp".'
-```
-
-If you already expose Superpowers skills to OMP another way (for example symlinks from a Claude Code plugin cache into `~/.omp/agent/skills`), remove those first so each skill name resolves to one copy.
+From a source checkout, run `bun test` to verify bootstrap injection and packaging.
 
 ## Remove
 
@@ -36,7 +32,9 @@ omp plugin uninstall @piyushmor/superpowers-omp
 
 ## Compatibility
 
-This adapter was tested with OMP `18.2.0` and re-verified with OMP `18.10.3` (extension lifecycle contract unchanged; live bootstrap injection confirmed in the provider payload).
+The current adapter targets OMP 19.x with Superpowers v7.0.2. Installation and
+nested skill reads were verified on OMP 19.2.0. OMP's `prewalk` model switching
+is optional; enable it only for execution sessions where you want a handoff.
 
 ## Trust boundary
 
@@ -51,16 +49,39 @@ upstream revision vendored into this package is recorded in `UPSTREAM.md`.
 
 ## Updating
 
-Because the skill snapshot is pinned, updates are explicit:
+Install a reviewed adapter commit to get its pinned skill snapshot:
 
-- Pin to a specific upstream-adapter commit:
+```bash
+omp plugin install 'github:piyushmor/superpowers-omp#<adapter-commit>'
+```
 
-  ```bash
-  omp plugin install github:piyushmor/superpowers-omp#<commit>
-  ```
+Replace `<adapter-commit>` with the Git commit SHA. Start a fresh OMP session
+and run the verification commands above after updating. [UPSTREAM.md](UPSTREAM.md)
+records the exact Superpowers revision shipped by the adapter.
 
-- Or do a fresh install after a new release of this package is published, which will carry
-  a newer pinned snapshot and an updated `UPSTREAM.md`.
+## Evals
 
-There is no npm registry package and no marketplace listing for this adapter; install and
-update only via the `github:` reference above.
+From a source checkout, validate coverage without a model call:
+
+```bash
+bun run eval:check
+bun run eval work --models "$MODEL" --repeats 3
+```
+
+The second command previews the run matrix and per-session budget. Set `MODEL`
+to an exact current OMP selector. A live run needs macOS and a dedicated OMP
+model configuration using environment or token-helper access. Each trial gets a
+fresh profile without saved auth or memory state. Use trusted public fixtures:
+the agent needs provider access, and the hidden grader runs without networking.
+
+```bash
+bun run eval skills --models "$CHEAP,$MID,$STRONG" --run --agent-dir "$PROFILE" --output /tmp/omp-skill-eval
+bun run eval work --models "$MODEL" --run --agent-dir "$PROFILE" --output /tmp/omp-work-eval
+```
+
+Pass skill models in ascending cost order. A candidate must pass the positive
+and near-miss cases and all held-out repetitions to earn a floor. Work runs
+alternate with/without Superpowers using one measured model and report scripted
+interactive replay and unattended stops separately. Replay uses OMP print mode
+and native continuation. Terminal `ask` forms are outside this benchmark. Keep
+per-run transcripts local.

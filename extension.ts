@@ -35,22 +35,17 @@ function getBootstrapContent(): string | null {
   return cachedBootstrap;
 }
 
-function textContainsBootstrap(text: string): boolean {
-  // Match the marker as a whole line (upstream OpenCode fix #2197): a quoted or
-  // inline mention of the marker must not suppress the real injection.
-  return text.split("\n").some(line => line.trim() === BOOTSTRAP_MARKER);
-}
-
-function blockContainsBootstrap(block: unknown): boolean {
+function blockContainsBootstrap(block: unknown, bootstrap: string): boolean {
   if (typeof block !== "object" || block === null) return false;
   const candidate = block as { type?: unknown; text?: unknown };
-  return candidate.type === "text" && typeof candidate.text === "string" && textContainsBootstrap(candidate.text);
+  return candidate.type === "text" && candidate.text === bootstrap;
 }
 
-function messageContainsBootstrap(message: { content: unknown }): boolean {
-  if (typeof message.content === "string") return textContainsBootstrap(message.content);
-  if (Array.isArray(message.content)) return message.content.some(blockContainsBootstrap);
-  return false;
+function messageContainsBootstrap(message: { role: string; content: unknown }, bootstrap: string): boolean {
+  // Check the actual injected user message. Other roles and quoted markers can still need a bootstrap.
+  if (message.role !== "user") return false;
+  if (message.content === bootstrap) return true;
+  return Array.isArray(message.content) && message.content.some(block => blockContainsBootstrap(block, bootstrap));
 }
 
 function bootstrapMessage(text: string) {
@@ -78,9 +73,9 @@ export default function superpowersOmpExtension(pi: ExtensionAPI): void {
     injectBootstrap = event.willContinue === true;
   });
   pi.on("context", async event => {
-    if (!injectBootstrap || event.messages.some(messageContainsBootstrap)) return;
+    if (!injectBootstrap) return;
     const bootstrap = getBootstrapContent();
-    if (!bootstrap) return;
+    if (!bootstrap || event.messages.some(message => messageContainsBootstrap(message, bootstrap))) return;
     const insertAt = firstNonCompactionSummaryIndex(event.messages);
     return {
       messages: [...event.messages.slice(0, insertAt), bootstrapMessage(bootstrap), ...event.messages.slice(insertAt)],

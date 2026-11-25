@@ -1,0 +1,1538 @@
+[
+ {
+  "id": "brainstorming-positive",
+  "skill": "brainstorming",
+  "kind": "positive",
+  "prompt": "I want to add CSV export to the report tool in this repo. Decide how to approach it before building anything. Work unattended; do not ask me questions and do not wait for approval. If a material design choice is unresolved, record it in docs/design-open-questions.md and do not implement.",
+  "files": {
+   "src/report.py": "def render_table(rows):\n    return '\\n'.join(' | '.join(map(str, r)) for r in rows)\n",
+   "README.md": "# report tool\nRows may be up to 5 million. Locales: en-US and de-DE (decimal comma, so ',' is ambiguous as delimiter). Export must not hold all rows in memory (streaming) or must it? Spec silent.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "brainstorming",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "docs/design-open-questions.md",
+    "exists": true
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "docs/design-open-questions.md",
+    "min": 1
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "src/report.py",
+    "max": 0
+   },
+   {
+    "kind": "file",
+    "path": "src/report.py",
+    "contains": "def render_table"
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "delimiter",
+     "streaming"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "brainstorming-near-miss",
+  "skill": "brainstorming",
+  "kind": "near-miss",
+  "prompt": "In src/report.py, fix the typo 'Totla' to 'Total' in the footer string. Nothing else. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/report.py": "def footer(n):\n    return f'Totla: {n}'\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "brainstorming",
+    "invoked": false
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "min": 1
+   },
+   {
+    "kind": "file",
+    "path": "src/report.py",
+    "contains": "Total:"
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "docs/",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "brainstorming-holdout",
+  "skill": "brainstorming",
+  "kind": "holdout",
+  "prompt": "Plan a 10-minute lightning talk on retry budgets for my team. I have no slides yet. Work unattended; do not ask me questions and do not wait for approval. Save the chosen structure to talk/outline.md and list the one choice you could not resolve alone (audience depth: SREs vs app developers) in the file under 'Open questions'.",
+  "files": {
+   "talk/notes.txt": "Retry budget = cap on retries as % of requests. Audience unknown: could be SREs or app developers.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "brainstorming",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "talk/outline.md",
+    "exists": true,
+    "contains": "Open questions"
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "audience"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "diagnosing-superpowers-positive",
+  "skill": "diagnosing-superpowers",
+  "kind": "positive",
+  "prompt": "The previous session transcript at logs/session-7.jsonl felt slow and the plan was ignored. Tell me why, from the log only. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "logs/session-7.jsonl": "{\"turn\": 1, \"tool\": \"read\", \"path\": \"src/a.py\"}\n{\"turn\": 2, \"tool\": \"read\", \"path\": \"src/a.py\"}\n{\"turn\": 3, \"tool\": \"read\", \"path\": \"src/a.py\"}\n{\"turn\": 4, \"tool\": \"read\", \"path\": \"src/a.py\"}\n{\"turn\": 5, \"msg\": \"Ignoring plan.md step 2, doing step 5 first\"}\n{\"turn\": 6, \"tool\": \"bash\", \"cmd\": \"pytest\"}\n{\"turn\": 7, \"tool\": \"bash\", \"cmd\": \"pytest\"}\n",
+   "plan.md": "1. add parser\n2. add tests\n5. docs\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "diagnosing-superpowers",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "read",
+    "contains": "logs/session-7.jsonl",
+    "min": 1
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "plan.md",
+     "same file",
+     "4 times"
+    ]
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "diagnosing-superpowers-near-miss",
+  "skill": "diagnosing-superpowers",
+  "kind": "near-miss",
+  "prompt": "My pytest run in this repo fails with an AssertionError in test_total. Find and fix the bug in src/calc.py. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/calc.py": "def total(xs):\n    return sum(xs[1:])\n",
+   "tests/test_calc.py": "from src.calc import total\ndef test_total():\n    assert total([1,2,3])==6\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "diagnosing-superpowers",
+    "invoked": false
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "min": 1,
+    "contains": "calc.py"
+   }
+  ]
+ },
+ {
+  "id": "diagnosing-superpowers-holdout",
+  "skill": "diagnosing-superpowers",
+  "kind": "holdout",
+  "prompt": "Why did the skill 'brainstorming' not fire in the session recorded at logs/run-12.txt? Explain with evidence from the file and draft a bug report in report.md for maintainers. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "logs/run-12.txt": "[00:00] user: build me a settings page\n[00:01] available skills: (none loaded; skill list empty due to config error 'skills.dir not found')\n[00:02] assistant: writing src/settings.tsx directly\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "diagnosing-superpowers",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "report.md",
+    "exists": true
+   },
+   {
+    "kind": "tool",
+    "tool": "read",
+    "contains": "run-12.txt",
+    "min": 1
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "run-12",
+     "skill list"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "dispatching-parallel-agents-positive",
+  "skill": "dispatching-parallel-agents",
+  "kind": "positive",
+  "prompt": "Three unrelated test files fail for different reasons: tests/test_a.py, tests/test_b.py, tests/test_c.py. They share no state or code. Investigate all three efficiently. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "tests/test_a.py": "def test_a():\n    assert 1+1==3\n",
+   "tests/test_b.py": "def test_b():\n    assert 'a'.upper()=='a'\n",
+   "tests/test_c.py": "def test_c():\n    assert [].pop()\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "dispatching-parallel-agents",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "min": 3
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "contains": "test_b.py",
+    "min": 1
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "test_a",
+     "test_b",
+     "test_c"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "dispatching-parallel-agents-near-miss",
+  "skill": "dispatching-parallel-agents",
+  "kind": "near-miss",
+  "prompt": "Two steps: first generate schema.sql from models.py, then apply schema.sql to build db.sqlite. Step 2 needs the output of step 1. Work unattended; do not ask me questions and do not wait for approval. Do them in order yourself.",
+  "files": {
+   "models.py": "TABLES={'users':['id','name']}\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "dispatching-parallel-agents",
+    "invoked": false
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "max": 0
+   },
+   {
+    "kind": "file",
+    "path": "schema.sql",
+    "exists": true
+   }
+  ]
+ },
+ {
+  "id": "dispatching-parallel-agents-holdout",
+  "skill": "dispatching-parallel-agents",
+  "kind": "holdout",
+  "prompt": "Fix three separate, independent typos: docs/a.md says 'recieve', docs/b.md says 'seperate', docs/c.md says 'occured'. Different files, no relation. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "docs/a.md": "We recieve data.\n",
+   "docs/b.md": "Keep seperate lists.\n",
+   "docs/c.md": "It occured twice.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "dispatching-parallel-agents",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "min": 2
+   },
+   {
+    "kind": "file",
+    "path": "docs/a.md",
+    "contains": "receive"
+   },
+   {
+    "kind": "file",
+    "path": "docs/b.md",
+    "contains": "separate"
+   },
+   {
+    "kind": "file",
+    "path": "docs/c.md",
+    "contains": "occurred"
+   }
+  ]
+ },
+ {
+  "id": "executing-plans-positive",
+  "skill": "executing-plans",
+  "kind": "positive",
+  "prompt": "Execute docs/plan.md inline yourself (no subagents available). Follow it task by task. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "docs/plan.md": "# Plan\n\n- [ ] Task 1: create src/greet.py with greet(name) returning 'Hello, <name>!'\n- [ ] Task 2: create tests/test_greet.py asserting greet('Ada')=='Hello, Ada!'\n- [ ] Task 3: add README.md line 'Usage: greet(name)'\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "executing-plans",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "src/greet.py",
+    "exists": true,
+    "contains": "Hello, "
+   },
+   {
+    "kind": "file",
+    "path": "tests/test_greet.py",
+    "exists": true
+   },
+   {
+    "kind": "file",
+    "path": "README.md",
+    "contains": "Usage: greet(name)"
+   },
+   {
+    "kind": "order",
+    "first": {
+     "tool": "write",
+     "contains": "greet.py"
+    },
+    "then": {
+     "tool": "write",
+     "contains": "test_greet.py"
+    }
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "executing-plans-near-miss",
+  "skill": "executing-plans",
+  "kind": "near-miss",
+  "prompt": "Write an implementation plan to docs/plan.md for adding a /health endpoint to app.py. Do not implement it. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "app.py": "def index():\n    return 'ok'\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "executing-plans",
+    "invoked": false
+   },
+   {
+    "kind": "file",
+    "path": "docs/plan.md",
+    "exists": true
+   },
+   {
+    "kind": "file",
+    "path": "app.py",
+    "contains": "def index"
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "app.py",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "executing-plans-holdout",
+  "skill": "executing-plans",
+  "kind": "holdout",
+  "prompt": "Carry out docs/plan.md. If a step is blocked or the plan has a gap, stop at that step and say so in your answer rather than guessing. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "docs/plan.md": "# Plan\n\n- Task 1: create src/a.py with `A=1`\n- Task 2: create src/b.py exporting the constant from src/config_schema.yaml (file is missing from repo; ask for it)\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "executing-plans",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "src/a.py",
+    "exists": true
+   },
+   {
+    "kind": "file",
+    "path": "src/b.py",
+    "exists": false
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "task 2",
+     "missing"
+    ]
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "b.py",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "finishing-a-development-branch-positive",
+  "skill": "finishing-a-development-branch",
+  "kind": "positive",
+  "prompt": "Branch feature/x is done and tests pass (see NOTES.md). Integrate it. Work unattended; do not ask me questions and do not wait for approval. Do not push, create PRs, or delete anything; just present the integration options with your recommendation in answer and write the choice to INTEGRATION.md.",
+  "files": {
+   "NOTES.md": "Branch feature/x is complete; tests pass (pytest: 12 passed). Base branch: main. Remote: none (local only repo, no push possible).\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "finishing-a-development-branch",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "INTEGRATION.md",
+    "exists": true
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "merge",
+     "pull request",
+     "keep",
+     "discard"
+    ]
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "git push",
+    "max": 0
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "branch -D",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "finishing-a-development-branch-near-miss",
+  "skill": "finishing-a-development-branch",
+  "kind": "near-miss",
+  "prompt": "Tests on feature/x are still failing (see NOTES.md). Fix by editing src/m.py, and do not integrate anything yet. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "NOTES.md": "pytest: 1 failed in test_m (m.inc returns x instead of x+1).\n",
+   "src/m.py": "def inc(x):\n    return x\n",
+   "tests/test_m.py": "from src.m import inc\ndef test_inc():\n    assert inc(1)==2\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "finishing-a-development-branch",
+    "invoked": false
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "m.py",
+    "min": 1
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "git merge",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "finishing-a-development-branch-holdout",
+  "skill": "finishing-a-development-branch",
+  "kind": "holdout",
+  "prompt": "Implementation of feature/y is finished and verified. Wrap up the branch; the repo is local with no remote. Work unattended; do not ask me questions and do not wait for approval. Do not execute destructive git commands. Record your recommended option and the cleanup steps you would run in WRAPUP.md.",
+  "files": {
+   "NOTES.md": "feature/y: 8 tests pass. Base: main. No remote configured.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "finishing-a-development-branch",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "WRAPUP.md",
+    "exists": true
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "git push",
+    "max": 0
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "reset --hard",
+    "max": 0
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "main"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "receiving-code-review-positive",
+  "skill": "receiving-code-review",
+  "kind": "positive",
+  "prompt": "Review comments are in REVIEW.md. Address them in src/util.py. Work unattended; do not ask me questions and do not wait for approval. Verify each suggestion technically; push back where wrong and say so in answer.",
+  "files": {
+   "REVIEW.md": "1. Rename `tmp` to `port_text` for clarity.\n2. Remove the int() cast in parse_port; ints are never strings here.\n",
+   "src/util.py": "def parse_port(s):\n    tmp = s.strip()\n    return int(tmp)\n",
+   "src/caller.py": "from util import parse_port\nPORT = parse_port(' 8080 ')\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "receiving-code-review",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "util.py",
+    "min": 1
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "comment 2",
+     "incorrect"
+    ]
+   },
+   {
+    "kind": "file",
+    "path": "src/util.py",
+    "contains": "def parse_port"
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "grep",
+    "min": 0
+   }
+  ]
+ },
+ {
+  "id": "receiving-code-review-near-miss",
+  "skill": "receiving-code-review",
+  "kind": "near-miss",
+  "prompt": "Please review src/util.py yourself and write findings to FINDINGS.md. I have received no feedback yet. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/util.py": "def avg(xs):\n    return sum(xs)/len(xs)\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "receiving-code-review",
+    "invoked": false
+   },
+   {
+    "kind": "file",
+    "path": "FINDINGS.md",
+    "exists": true
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "util.py",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "receiving-code-review-holdout",
+  "skill": "receiving-code-review",
+  "kind": "holdout",
+  "prompt": "A reviewer wrote in REVIEW.md. Handle it. Work unattended; do not ask me questions and do not wait for approval. If something is unclear, do not guess; list the unclear item in answer and apply only the clear ones.",
+  "files": {
+   "REVIEW.md": "1. Bump TIMEOUT to 30.\n2. Make this more robust.\n",
+   "cfg.py": "TIMEOUT = 10\nRETRIES = 3\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "receiving-code-review",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "cfg.py",
+    "min": 1
+   },
+   {
+    "kind": "file",
+    "path": "cfg.py",
+    "contains": "TIMEOUT = 30"
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "clarif",
+     "item 2"
+    ]
+   },
+   {
+    "kind": "file",
+    "path": "cfg.py",
+    "contains": "RETRIES = 3"
+   }
+  ]
+ },
+ {
+  "id": "requesting-code-review-positive",
+  "skill": "requesting-code-review",
+  "kind": "positive",
+  "prompt": "I finished adding discount logic in src/price.py (see git diff). Before merging, get it reviewed. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/price.py": "def discount(p, pct):\n    return p - p*pct/100\n",
+   "TASK.md": "Requirement: discount must reject pct>100 or <0.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "requesting-code-review",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "min": 1
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "contains": "price.py",
+    "min": 1
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "git diff",
+    "min": 0
+   }
+  ]
+ },
+ {
+  "id": "requesting-code-review-near-miss",
+  "skill": "requesting-code-review",
+  "kind": "near-miss",
+  "prompt": "Just reformat docs/notes.md to wrap lines at 80 chars. No review needed. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "docs/notes.md": "This is a very long line of notes that goes well beyond the eighty column limit set by the team style guide for docs.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "requesting-code-review",
+    "invoked": false
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "max": 0
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "min": 1
+   }
+  ]
+ },
+ {
+  "id": "requesting-code-review-holdout",
+  "skill": "requesting-code-review",
+  "kind": "holdout",
+  "prompt": "Major feature complete: src/cart.py implements cart totals per SPEC.md. Verify it meets requirements with an independent check, and put the result in REVIEW_RESULT.md. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "SPEC.md": "Cart total = sum(items) + 20% tax, rounded to 2 decimals.\n",
+   "src/cart.py": "def total(items):\n    return round(sum(items),2)\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "requesting-code-review",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "min": 1
+   },
+   {
+    "kind": "file",
+    "path": "REVIEW_RESULT.md",
+    "exists": true
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "tax"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "subagent-driven-development-positive",
+  "skill": "subagent-driven-development",
+  "kind": "positive",
+  "prompt": "Execute docs/plan.md in this session using subagents per task, with review after each. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "docs/plan.md": "# Plan\n\n- Task 1: src/a.py defining `def a(): return 1`\n- Task 2: src/b.py defining `def b(): return 2`\n- Task 3: src/c.py defining `def c(): return 3`\nTasks are independent. Subagents are available.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "subagent-driven-development",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "min": 3
+   },
+   {
+    "kind": "file",
+    "path": "src/a.py",
+    "exists": true
+   },
+   {
+    "kind": "file",
+    "path": "src/b.py",
+    "exists": true
+   },
+   {
+    "kind": "file",
+    "path": "src/c.py",
+    "exists": true
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "contains": "Task 2",
+    "min": 1
+   }
+  ]
+ },
+ {
+  "id": "subagent-driven-development-near-miss",
+  "skill": "subagent-driven-development",
+  "kind": "near-miss",
+  "prompt": "Inline-only: no subagent tool exists. Implement docs/plan.md yourself, task by task. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "docs/plan.md": "# Plan\n\n- Task 1: src/a.py defining `def a(): return 1`\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "subagent-driven-development",
+    "invoked": false
+   },
+   {
+    "kind": "skill",
+    "name": "executing-plans",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "max": 0
+   },
+   {
+    "kind": "file",
+    "path": "src/a.py",
+    "exists": true
+   }
+  ]
+ },
+ {
+  "id": "subagent-driven-development-holdout",
+  "skill": "subagent-driven-development",
+  "kind": "holdout",
+  "prompt": "Implement docs/plan.md via fresh subagents. Controller must not implement itself; check each result against the plan and record the check in LOG.md. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "docs/plan.md": "# Plan\n\n- Task 1: src/x.py with `X=1`\n- Task 2: src/y.py with `Y=2`\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "subagent-driven-development",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "task",
+    "min": 2
+   },
+   {
+    "kind": "file",
+    "path": "LOG.md",
+    "exists": true
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "src/",
+    "max": 0
+   },
+   {
+    "kind": "file",
+    "path": "src/x.py",
+    "exists": true
+   },
+   {
+    "kind": "file",
+    "path": "src/y.py",
+    "exists": true
+   }
+  ]
+ },
+ {
+  "id": "systematic-debugging-positive",
+  "skill": "systematic-debugging",
+  "kind": "positive",
+  "prompt": "tests/test_slug.py fails. Fix the bug. Work unattended; do not ask me questions and do not wait for approval. Find root cause before changing code.",
+  "files": {
+   "src/slug.py": "def slug(s):\n    return s.replace(' ','-')\n",
+   "tests/test_slug.py": "from src.slug import slug\ndef test_slug():\n    assert slug(' Hello World ')=='hello-world'\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "systematic-debugging",
+    "invoked": true
+   },
+   {
+    "kind": "order",
+    "first": {
+     "tool": "bash",
+     "contains": "pytest"
+    },
+    "then": {
+     "tool": "edit",
+     "contains": "slug.py"
+    }
+   },
+   {
+    "kind": "file",
+    "path": "src/slug.py",
+    "contains": "lower()"
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "root cause",
+     "strip"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "systematic-debugging-near-miss",
+  "skill": "systematic-debugging",
+  "kind": "near-miss",
+  "prompt": "Add a new function double(x) to src/m.py returning 2*x. There is no bug. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/m.py": "def one():\n    return 1\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "systematic-debugging",
+    "invoked": false
+   },
+   {
+    "kind": "file",
+    "path": "src/m.py",
+    "contains": "def double"
+   }
+  ]
+ },
+ {
+  "id": "systematic-debugging-holdout",
+  "skill": "systematic-debugging",
+  "kind": "holdout",
+  "prompt": "Intermittent: src/flaky.py returns wrong value on the 3rd call. I already tried changing the default to 0 and it didn't help. Don't guess a fourth fix. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/flaky.py": "def add(x, acc=[]):\n    acc.append(x)\n    return sum(acc)\n",
+   "NOTES.md": "add(1)=1, add(1)=1 ... third call returns 3 not 1. Tried default=0 earlier; no change.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "systematic-debugging",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "read",
+    "contains": "flaky.py",
+    "min": 1
+   },
+   {
+    "kind": "order",
+    "first": {
+     "tool": "read",
+     "contains": "flaky.py"
+    },
+    "then": {
+     "tool": "edit",
+     "contains": "flaky.py"
+    }
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "cache",
+     "mutable"
+    ]
+   },
+   {
+    "kind": "file",
+    "path": "src/flaky.py",
+    "contains": "None"
+   }
+  ]
+ },
+ {
+  "id": "test-driven-development-positive",
+  "skill": "test-driven-development",
+  "kind": "positive",
+  "prompt": "Implement is_even(n) in src/num.py. Work unattended; do not ask me questions and do not wait for approval. Tests live in tests/test_num.py.",
+  "files": {
+   "README.md": "python project; run pytest\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "test-driven-development",
+    "invoked": true
+   },
+   {
+    "kind": "order",
+    "first": {
+     "tool": "write",
+     "contains": "test_num.py"
+    },
+    "then": {
+     "tool": "write",
+     "contains": "src/num.py"
+    }
+   },
+   {
+    "kind": "file",
+    "path": "tests/test_num.py",
+    "contains": "is_even"
+   },
+   {
+    "kind": "file",
+    "path": "src/num.py",
+    "contains": "def is_even"
+   }
+  ]
+ },
+ {
+  "id": "test-driven-development-near-miss",
+  "skill": "test-driven-development",
+  "kind": "near-miss",
+  "prompt": "Update the version string in pyproject.toml from 1.0.0 to 1.0.1. Config only. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "pyproject.toml": "[project]\nname='x'\nversion='1.0.0'\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "test-driven-development",
+    "invoked": false
+   },
+   {
+    "kind": "file",
+    "path": "pyproject.toml",
+    "contains": "1.0.1"
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "test_",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "test-driven-development-holdout",
+  "skill": "test-driven-development",
+  "kind": "holdout",
+  "prompt": "Bug: clamp(x,lo,hi) in src/clamp.py returns lo for x>hi. Fix it, reproducing the bug first. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/clamp.py": "def clamp(x, lo, hi):\n    if x < lo or x > hi:\n        return lo\n    return x\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "test-driven-development",
+    "invoked": true
+   },
+   {
+    "kind": "order",
+    "first": {
+     "tool": "bash",
+     "contains": "pytest"
+    },
+    "then": {
+     "tool": "edit",
+     "contains": "clamp.py"
+    }
+   },
+   {
+    "kind": "file",
+    "path": "tests/test_clamp.py",
+    "exists": true
+   },
+   {
+    "kind": "file",
+    "path": "src/clamp.py",
+    "contains": "hi"
+   }
+  ]
+ },
+ {
+  "id": "using-git-worktrees-positive",
+  "skill": "using-git-worktrees",
+  "kind": "positive",
+  "prompt": "Start the feature 'search-filters' in an isolated workspace so my main checkout stays clean. Work unattended; do not ask me questions and do not wait for approval. Create any worktree under .worktrees/ only inside this repo; do not push.",
+  "files": {
+   ".gitignore": "__pycache__/\n",
+   "README.md": "demo repo\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "using-git-worktrees",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "worktree add",
+    "min": 1
+   },
+   {
+    "kind": "file",
+    "path": ".gitignore",
+    "contains": ".worktrees"
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "git push",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "using-git-worktrees-near-miss",
+  "skill": "using-git-worktrees",
+  "kind": "near-miss",
+  "prompt": "I'm already inside a linked worktree for this feature. Just edit app.py to rename foo to bar. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "app.py": "def foo():\n    return 1\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "using-git-worktrees",
+    "invoked": false
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "worktree add",
+    "max": 0
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "app.py",
+    "min": 1
+   }
+  ]
+ },
+ {
+  "id": "using-git-worktrees-holdout",
+  "skill": "using-git-worktrees",
+  "kind": "holdout",
+  "prompt": "Before executing docs/plan.md, set up isolation. The repo ignores nothing yet. Make sure worktree dir is not tracked by accident. Work unattended; do not ask me questions and do not wait for approval. Do not execute the plan.",
+  "files": {
+   "docs/plan.md": "# Plan\n- Task 1: src/a.py\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "using-git-worktrees",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "worktree",
+    "min": 1
+   },
+   {
+    "kind": "file",
+    "path": ".gitignore",
+    "contains": "worktree"
+   },
+   {
+    "kind": "file",
+    "path": "src/a.py",
+    "exists": false
+   }
+  ]
+ },
+ {
+  "id": "using-superpowers-positive",
+  "skill": "using-superpowers",
+  "kind": "positive",
+  "prompt": "Fix this: tests/test_a.py fails with assertion error; code in src/a.py. Work unattended; do not ask me questions and do not wait for approval. Use the right workflow skill before acting.",
+  "files": {
+   "src/a.py": "def f():\n    return 1\n",
+   "tests/test_a.py": "from src.a import f\ndef test_f():\n    assert f()==2\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "systematic-debugging",
+    "invoked": true
+   },
+   {
+    "kind": "order",
+    "first": {
+     "tool": "read",
+     "contains": "systematic-debugging"
+    },
+    "then": {
+     "tool": "edit",
+     "contains": "a.py"
+    }
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "a.py",
+    "min": 1
+   }
+  ]
+ },
+ {
+  "id": "using-superpowers-near-miss",
+  "skill": "using-superpowers",
+  "kind": "near-miss",
+  "prompt": "What is 17*3? Answer in one word of digits. Work unattended; do not ask me questions and do not wait for approval. ",
+  "checks": [
+   {
+    "kind": "answer",
+    "includes": [
+     "51"
+    ]
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "max": 0
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "using-superpowers-holdout",
+  "skill": "using-superpowers",
+  "kind": "holdout",
+  "prompt": "I want to add dark mode toggle to ui/app.js. Get going. Work unattended; do not ask me questions and do not wait for approval. Follow your process; do not edit ui/app.js yet if a design choice is open.",
+  "files": {
+   "ui/app.js": "function render(){ document.body.className='light'; }\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "brainstorming",
+    "invoked": true
+   },
+   {
+    "kind": "order",
+    "first": {
+     "tool": "read",
+     "contains": "brainstorming"
+    },
+    "then": {
+     "tool": "write"
+    }
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "ui/app.js",
+    "max": 0
+   },
+   {
+    "kind": "file",
+    "path": "ui/app.js",
+    "contains": "render"
+   }
+  ]
+ },
+ {
+  "id": "verification-before-completion-positive",
+  "skill": "verification-before-completion",
+  "kind": "positive",
+  "prompt": "I changed src/sum.py. Tell me if the tests pass. Work unattended; do not ask me questions and do not wait for approval. Only claim success with evidence.",
+  "files": {
+   "src/sum.py": "def s(a,b):\n    return a-b\n",
+   "tests/test_sum.py": "from src.sum import s\ndef test_s():\n    assert s(1,2)==3\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "verification-before-completion",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "contains": "pytest",
+    "min": 1
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "1 failed"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "verification-before-completion-near-miss",
+  "skill": "verification-before-completion",
+  "kind": "near-miss",
+  "prompt": "Explain in the answer what the function in src/sum.py does. Don't run anything. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/sum.py": "def s(a,b):\n    return a-b\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "verification-before-completion",
+    "invoked": false
+   },
+   {
+    "kind": "tool",
+    "tool": "bash",
+    "max": 0
+   },
+   {
+    "kind": "unchanged"
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "subtract"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "verification-before-completion-holdout",
+  "skill": "verification-before-completion",
+  "kind": "holdout",
+  "prompt": "Fix the off-by-one in src/range.py, then confirm done. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/range.py": "def upto(n):\n    return list(range(n))\n",
+   "tests/test_range.py": "from src.range import upto\ndef test_upto():\n    assert upto(3)==[0,1,2,3]\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "verification-before-completion",
+    "invoked": true
+   },
+   {
+    "kind": "order",
+    "first": {
+     "tool": "edit",
+     "contains": "range.py"
+    },
+    "then": {
+     "tool": "bash",
+     "contains": "pytest"
+    }
+   },
+   {
+    "kind": "file",
+    "path": "src/range.py",
+    "contains": "+ 1"
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "passed"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "writing-plans-positive",
+  "skill": "writing-plans",
+  "kind": "positive",
+  "prompt": "Write the implementation plan for docs/spec.md into docs/plan.md. Work unattended; do not ask me questions and do not wait for approval. Do not implement. If the spec leaves a material choice unresolved, surface it explicitly in the plan's 'Open decisions' section and do not silently pick.",
+  "files": {
+   "docs/spec.md": "# Spec: CLI todo app\nStore todos in a file. Commands: add, list, done. Storage: JSON file OR SQLite (spec undecided; marks irreversible data format). Language: Python.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "writing-plans",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "docs/plan.md",
+    "exists": true,
+    "contains": "Open decisions"
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "sqlite",
+     "json"
+    ]
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "src/",
+    "max": 0
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "docs/plan.md",
+    "min": 1
+   }
+  ]
+ },
+ {
+  "id": "writing-plans-near-miss",
+  "skill": "writing-plans",
+  "kind": "near-miss",
+  "prompt": "Implement add_one(x) in src/m.py returning x+1. It's a one-line change; no plan needed. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/m.py": "# helpers\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "writing-plans",
+    "invoked": false
+   },
+   {
+    "kind": "file",
+    "path": "src/m.py",
+    "contains": "def add_one"
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "docs/plan",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "writing-plans-holdout",
+  "skill": "writing-plans",
+  "kind": "holdout",
+  "prompt": "From docs/spec.md produce a bite-sized plan in docs/plan.md with exact file paths and test steps, no implementation. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "docs/spec.md": "# Spec\nAdd src/slugify.py with slugify(text): lowercase, spaces to hyphens, strip punctuation. Tests under tests/.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "writing-plans",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "docs/plan.md",
+    "exists": true,
+    "contains": "tests/"
+   },
+   {
+    "kind": "file",
+    "path": "docs/plan.md",
+    "contains": "src/slugify.py"
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "src/slugify.py",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "writing-skills-positive",
+  "skill": "writing-skills",
+  "kind": "positive",
+  "prompt": "Create a new skill 'log-triage' at skills/log-triage/SKILL.md for triaging application logs. Frontmatter must have name and a description that starts with 'Use when'. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "skills/example/SKILL.md": "---\nname: example\ndescription: Use when demonstrating format\n---\n# Example\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "writing-skills",
+    "invoked": true
+   },
+   {
+    "kind": "file",
+    "path": "skills/log-triage/SKILL.md",
+    "exists": true,
+    "contains": "name: log-triage"
+   },
+   {
+    "kind": "file",
+    "path": "skills/log-triage/SKILL.md",
+    "contains": "description: Use when"
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "skills/log-triage/SKILL.md",
+    "min": 1
+   }
+  ]
+ },
+ {
+  "id": "writing-skills-near-miss",
+  "skill": "writing-skills",
+  "kind": "near-miss",
+  "prompt": "Add a function to src/log.py named triage(line) that returns 'error' if 'ERROR' in line else 'ok'. Not a skill. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "src/log.py": "# log helpers\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "writing-skills",
+    "invoked": false
+   },
+   {
+    "kind": "file",
+    "path": "src/log.py",
+    "contains": "def triage"
+   },
+   {
+    "kind": "tool",
+    "tool": "write",
+    "contains": "SKILL.md",
+    "max": 0
+   }
+  ]
+ },
+ {
+  "id": "writing-skills-holdout",
+  "skill": "writing-skills",
+  "kind": "holdout",
+  "prompt": "skills/bad/SKILL.md has a description that summarizes its workflow, so agents skip reading it. Fix the description. Work unattended; do not ask me questions and do not wait for approval. ",
+  "files": {
+   "skills/bad/SKILL.md": "---\nname: bad\ndescription: Runs tests, then reviews diffs, then writes a summary and commits\n---\n# Bad\nBody.\n"
+  },
+  "checks": [
+   {
+    "kind": "skill",
+    "name": "writing-skills",
+    "invoked": true
+   },
+   {
+    "kind": "tool",
+    "tool": "edit",
+    "contains": "skills/bad/SKILL.md",
+    "min": 1
+   },
+   {
+    "kind": "file",
+    "path": "skills/bad/SKILL.md",
+    "contains": "description: Use when"
+   },
+   {
+    "kind": "answer",
+    "includes": [
+     "description"
+    ]
+   }
+  ]
+ }
+]

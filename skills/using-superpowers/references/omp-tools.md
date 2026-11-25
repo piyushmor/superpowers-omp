@@ -1,92 +1,17 @@
 # OMP (Oh My Pi) Tool Mapping
 
-Skills speak in actions ("dispatch a subagent", "create a todo", "read a file"). On OMP (Oh My Pi) these resolve to the tools below.
+Use OMP's native tools for the actions in Superpowers skills:
 
-| Action skills request | OMP equivalent |
+| Action | OMP tool |
 |---|---|
-| Read a file | `read` |
-| Create a new file | `write` |
-| Edit a file (targeted patch) | `edit` |
-| Run a shell command | `bash` |
-| Search file contents | `grep` |
-| Find files by name | `glob` |
-| Fetch a URL / read a webpage | `read` with a URL path |
-| Search the web | `web_search` |
-| Dispatch a subagent (`Subagent (general-purpose):` template) | `task` |
-| Multiple parallel dispatches | A single `task` call with multiple entries in its batch |
-| Task tracking ("create a todo", "mark complete") | `todo` |
-| Ask the user a question | `ask` |
-| Invoke a skill | `skill://<name>` (read the resource) or the `/skill:<name>` command |
+| Load the full skill or a bundled reference | `read skill://<name>` or `read skill://<name>/<relative-path>` |
+| Read a file or URL | `read` |
+| Create or patch files; run commands | `write`, `edit`, `bash` |
+| Find files, text, or web results | `glob`, `grep`, `web_search` |
+| Ask the user to decide | `ask` |
+| Track approved work | `todo` |
+| Dispatch reviewers or workers | `task` |
 
-## Subagent dispatch
+Batch independent subagents in one `task` call. Their results arrive automatically. Inspect a job with `read proc://<id>`, message a live agent with `write agent://<id>`, and use `wait` for jobs you own when the tool is available.
 
-`task` does not take one prompt at a time: it receives a batch of disjoint tasks in a single call and
-runs them concurrently. When a skill's template calls for dispatching several independent subagents
-(e.g. parallel reviewers, parallel implementers), issue one `task` call whose batch contains every
-independent unit of work rather than issuing `task` repeatedly in sequence. Reserve sequential `task`
-calls for genuinely dependent work, where a later task needs the output of an earlier one.
-
-## Coordination and waiting
-
-OMP 19.x has no `hub` tool; coordination uses these primitives:
-
-- A `task` result returns automatically when the dispatched subagent finishes — no result-sending
-call is needed on either side.
-- To message a live peer (main agent or another dispatched subagent), `write` to `agent://<id>`.
-- To block until an outstanding job reports idle or finished, use the `wait` tool.
-- To inspect a running or finished job's state, `read` `proc://<id>`.
-
-Where a skill says to "wait for" a dispatched subagent or "check in" on its progress, that resolves
-to `wait` and `read proc://<id>`; where it says a subagent should "report back" or "send a message",
-that resolves to the automatic `task` result or `write agent://<id>`.
-
-## Invoking a skill
-
-Skills are read before acting on them, not merely referenced. To invoke a superpowers skill on OMP,
-read `skill://<name>` (e.g. `skill://brainstorming`) or use the `/skill:<name>` slash command, and read
-its full contents before starting the action it describes.
-
-Files shipped inside a skill are read the same way, with the path relative to the skill's root:
-`read skill://<skill-name>/<relative-path>` (e.g. `skill://subagent-driven-development/references/fix-loop.md`).
-If a `skill://` read fails, the same file resolves on disk under the plugin install, e.g.
-`~/.omp/plugins/node_modules/@piyushmor/superpowers-omp/skills/<name>/<relative-path>`.
-
-## Skill and session locations
-
-- Personal skills live at `~/.omp/agent/managed-skills/` and are managed with the `manage_skill` tool
-(not `~/.claude/skills/`, which does not exist on OMP).
-- Session transcripts live under `~/.omp/agent/sessions/<cwd-slug>/` as
-`<ISO-timestamp>_<session-id>.jsonl` (one JSON event per line), with a per-session child directory
-holding subagent transcripts. This is the root `diagnosing-superpowers` starts from when locating a
-session.
-- The brainstorming visual companion launches like the Claude Code default-mode recipe in
-`visual-companion.md`: `bash scripts/start-server.sh --project-dir /path/to/project --open` — the
-script backgrounds the server itself, so no extra flags are needed on OMP.
-
-## Plans & TDD → todo (OMP's workflow substrate)
-
-OMP's `todo` tool is the live workflow view, and OMP features key off it: `prewalk` switches the
-session to the fast model at the first edit/write once the plan's todo list exists. Superpowers
-plans stay the authority — the plan file and the SDD ledger are the record; todo is their live
-projection, never the spec.
-
-- At plan handoff (writing-plans → execution), after the plan is approved, mirror it with `todo`
-  `init`: one phase per plan milestone, one item per `Task N: <title> — verify: <test command>`.
-  Task-level granularity only — never one item per TDD micro-step; todo churn costs turns.
-- Task lifecycle (executing-plans and the SDD controller): `task-start` → `todo` `start` on that
-  item; `task-done` (completion contract met, ledger line written) → `todo` `done`. A ruling or a
-  blocked task keeps its item in_progress; the detail lives in the ledger.
-- TDD reflection: RED/GREEN discipline stays in the ledger and the test runs. The todo item moves
-  start→done only when the completion contract holds — test watched fail, then pass, suite green.
-  Do not encode RED/GREEN as separate todo items.
-- Scope changes mid-run: edit the plan/ledger first (the record), then reflect with `todo` `append` /
-  `drop` / `rm`. Todo follows the plan, never the reverse.
-- After compaction, rebuild todo from the ledger's `Task N: complete` lines and `git log`, not from
-  memory; the ledger outranks the todo view.
-- Prewalk: with the todo mirror in place, run plan execution with `--prewalk` (or `prewalk.enabled`)
-  so implementation moves to the smol model at first edit — executing-plans is designed for a
-  mid-tier session model. The final whole-branch review still runs on the most capable model:
-  dispatch it with an explicit model, as the skill requires; prewalk does not override an explicit
-  subagent model. This bridges file-based superpowers plans, not OMP's native `--plan` mode.
-- Subagents: dispatched children get their own todo preludes and track their own brief; the
-  controller's todo mirrors the plan.
+Before requesting spec or plan approval, load `skill://using-superpowers/references/omp-workflows.md` and run its grilling step. The same guide covers OMP-specific execution, skill authoring, transcripts, worktrees, and the brainstorming companion.
