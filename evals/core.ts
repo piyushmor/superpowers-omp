@@ -1,5 +1,7 @@
 export type Arm = "plain" | "superpowers";
 export type Mode = "interactive" | "unattended";
+export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type ThinkingLevel = (typeof thinkingLevels)[number];
 export type ToolMatch = { tool: string; contains?: string };
 export type Check =
   | ({ kind: "tool"; min?: number; max?: number } & ToolMatch)
