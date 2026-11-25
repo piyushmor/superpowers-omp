@@ -89,3 +89,7 @@ alternate with/without Superpowers using one measured model and report scripted
 interactive replay and unattended stops separately. Replay uses OMP print mode
 and native continuation. Terminal `ask` forms are outside this benchmark. Keep
 per-run transcripts local.
+
+Run `python3 evals/approval-smoke.py` for a provider-free check of OMP's native
+RPC UI write-permission and Ask-form responses. The smoke uses a loopback model
+and exercises approval, decline, and cancellation in isolated workspaces.
